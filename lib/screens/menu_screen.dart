@@ -223,6 +223,26 @@ class _MenuScreenState extends State<MenuScreen> {
                   }
                 },
               ),
+              const Divider(color: Colors.white24),
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_forever,
+                  color: Colors.redAccent,
+                ),
+                title: const Text(
+                  'Delete my account',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+                subtitle: const Text(
+                  'Permanently remove your account and data',
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                ),
+                onTap: () {
+                  AudioService.playButtonSound();
+                  Navigator.pop(dialogContext);
+                  _deleteAccount();
+                },
+              ),
             ],
           ),
         ),
@@ -326,6 +346,53 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _deleteAccount() async {
+    _announce('Delete my account');
+
+    final password = await showDialog<String>(
+      context: context,
+      builder: (_) => const _DeleteAccountDialog(),
+    );
+
+    if (!mounted || password == null || password.isEmpty) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final error = await _auth.deleteOwnAccount(
+      password: password,
+      phone: widget.user.phone,
+    );
+
+    if (!mounted) return;
+
+    Navigator.of(context).pop(); // close the progress indicator
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error)),
+      );
+      return;
+    }
+
+    await VoiceAssistantService.instance.stop();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Your account has been deleted.')),
+    );
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
   }
 
   void _selectDifficulty(Difficulty difficulty) {
@@ -804,6 +871,86 @@ class _EditBioDialogState extends State<_EditBioDialog> {
             Navigator.pop(context, _controller.text.trim());
           },
           child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Asks for the password before the account is deleted. Owns its text
+/// controller so it is disposed only after the dialog is gone.
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final TextEditingController _passwordController = TextEditingController();
+  bool _obscure = true;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppTheme.background,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Colors.redAccent, width: 2),
+      ),
+      title: const Text(
+        'Delete Account?',
+        style: TextStyle(color: Colors.redAccent),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'This permanently deletes your account, statistics, game '
+            'history, bio and leaderboard entry. It cannot be undone.\n\n'
+            'Enter your password to confirm.',
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscure,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Password',
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscure ? Icons.visibility : Icons.visibility_off,
+                ),
+                onPressed: () => setState(() => _obscure = !_obscure),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            AudioService.playButtonSound();
+            Navigator.pop(context);
+          },
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () {
+            AudioService.playButtonSound();
+            Navigator.pop(context, _passwordController.text);
+          },
+          child: const Text(
+            'Delete forever',
+            style: TextStyle(color: Colors.redAccent),
+          ),
         ),
       ],
     );

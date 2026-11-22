@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'account_status_service.dart';
+import 'leaderboard_service.dart';
+
 class FirestoreSyncService {
   final FirebaseFirestore _firestore =
       FirebaseFirestore.instance;
@@ -42,6 +45,9 @@ class FirestoreSyncService {
         (normalizedDifficulty?.length ?? 0) > 30) {
       throw ArgumentError('Game information exceeds allowed length.');
     }
+
+    // Stop here (and sign the player out) if an admin has blocked them.
+    await AccountStatusService.instance.ensureActive();
 
     final uid = currentUser.uid;
 
@@ -87,6 +93,14 @@ class FirestoreSyncService {
     );
 
     // 7. Commit both writes together.
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (e) {
+      await AccountStatusService.instance.checkAfterFailure(e);
+      rethrow;
+    }
+
+    // Update this player's public leaderboard entry from the saved stats.
+    await LeaderboardService().syncMyEntry();
   }
-}
+}

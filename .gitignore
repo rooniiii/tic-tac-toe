@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local crash / error logs
+neon_crash_log.txt
+neon_errors_only.txt
+*.log

@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:flutter/material.dart';
 import '../logic/profile_service.dart';
+import '../services/leaderboard_service.dart';
 import '../models/user.dart';
 import '../models/user_stats.dart';
 import '../theme/app_theme.dart';
@@ -25,9 +27,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   bool _loading = true;
 
+  final LeaderboardService _leaderboard = LeaderboardService();
+  late Future<List<LeaderboardEntry>> _globalFuture;
+
   @override
   void initState() {
     super.initState();
+    _globalFuture = _leaderboard.getTop();
     _load();
   }
 
@@ -119,9 +125,99 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     );
   }
 
+  Widget _globalTab() {
+    final myUid = firebase.FirebaseAuth.instance.currentUser?.uid;
+
+    return FutureBuilder<List<LeaderboardEntry>>(
+      future: _globalFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'The online leaderboard needs an internet connection. '
+                'Tap refresh to try again.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+          );
+        }
+
+        final entries = snapshot.data ?? [];
+
+        if (entries.isEmpty) {
+          return const Center(
+            child: Text(
+              'No ranked players yet. Play an online game to appear here!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white70),
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: entries.length,
+          itemBuilder: (context, index) {
+            final entry = entries[index];
+            final isMe = entry.uid == myUid;
+            final rankColor = switch (index) {
+              0 => AppTheme.neonYellow,
+              1 => AppTheme.neonCyan,
+              2 => AppTheme.neonPink,
+              _ => Colors.white70,
+            };
+
+            return Card(
+              color: isMe ? const Color(0x5500E5FF) : const Color(0x337B2FF7),
+              margin: const EdgeInsets.only(bottom: 10),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.black26,
+                  child: Text(
+                    '${index + 1}',
+                    style: TextStyle(
+                      color: rankColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  isMe ? '${entry.name} (you)' : entry.name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  'Played ${entry.gamesPlayed} - '
+                  'Win rate ${entry.winRate.toStringAsFixed(0)}%',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                trailing: Text(
+                  '${entry.wins} W',
+                  style: TextStyle(
+                    color: rankColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         leading: IconButton(
@@ -137,17 +233,31 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               AudioService.playButtonSound();
-              setState(() => _loading = true);
+              setState(() {
+                _loading = true;
+                _globalFuture = _leaderboard.getTop();
+              });
               _load();
             },
           ),
         ],
         title: const Text(
-          'My Performance',
+          'Leaderboard',
           style: TextStyle(color: AppTheme.neonYellow),
         ),
+        bottom: const TabBar(
+          indicatorColor: AppTheme.neonCyan,
+          labelColor: AppTheme.neonCyan,
+          unselectedLabelColor: Colors.white70,
+          tabs: [
+            Tab(text: 'MY STATS'),
+            Tab(text: 'GLOBAL TOP 20'),
+          ],
+        ),
       ),
-      body: _loading
+      body: TabBarView(
+        children: [
+      _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
         padding: const EdgeInsets.all(16),
@@ -198,6 +308,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             AppTheme.neonCyan,
           ),
         ],
+      ),
+          _globalTab(),
+        ],
+      ),
       ),
     );
   }

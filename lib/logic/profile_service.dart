@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../database/app_database.dart';
 import '../models/user_stats.dart';
+import '../services/account_status_service.dart';
 
 class ProfileService {
   final AppDatabase _db = AppDatabase.instance;
@@ -32,6 +33,9 @@ class ProfileService {
     if (firebaseUser == null) return;
 
     try {
+      // Stop here (and sign the player out) if an admin has blocked them.
+      await AccountStatusService.instance.ensureActive();
+
       await _firestore
           .collection('user_profiles')
           .doc(firebaseUser.uid)
@@ -48,6 +52,11 @@ class ProfileService {
 
       await prefs.remove(_pendingBioKey(phone));
     } catch (e) {
+      if (await AccountStatusService.instance.checkAfterFailure(e)) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_pendingBioKey(phone));
+        return;
+      }
       // Keep pending bio for the next sync attempt.
     }
   }
@@ -221,4 +230,4 @@ class ProfileService {
       }
     } catch (_) {}
   }
-}
+}
