@@ -260,19 +260,6 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
-  void _goToLogin() {
-    AudioService.playButtonSound();
-    _announce('Back to Login');
-
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const LoginScreen(),
-      ),
-          (route) => false,
-    );
-  }
-
   Future<void> _logout() async {
     AudioService.playButtonSound();
     _announce('Logout. Are you sure you want to logout?');
@@ -635,12 +622,6 @@ class _MenuScreenState extends State<MenuScreen> {
               ),
               child: Row(
                 children: [
-                  _topIcon(
-                    'Back to Login',
-                    Icons.arrow_back_rounded,
-                    AppTheme.neonCyan,
-                    _goToLogin,
-                  ),
                   _logoutButton(),
                   const Spacer(),
                   _topIcon(

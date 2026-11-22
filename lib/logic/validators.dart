@@ -1,4 +1,8 @@
 class Validators {
+  /// Longest email address allowed by the email standard (RFC 5321).
+  /// Used by every email field in both apps and by the Firestore rules.
+  static const int maxEmailLength = 254;
+
   static String? name(String? v) {
     if (v == null || v.trim().isEmpty) {
       return 'Name is required';
@@ -19,8 +23,8 @@ class Validators {
     if (v == null || v.trim().isEmpty) {
       return 'Email is required';
     }
-    if (v.trim().length > 40) {
-      return 'Email must be at most 40 characters';
+    if (v.trim().length > maxEmailLength) {
+      return 'Email must be at most $maxEmailLength characters';
     }
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
         .hasMatch(v.trim())) {
@@ -69,4 +73,4 @@ class Validators {
     }
     return null;
   }
-}
+}

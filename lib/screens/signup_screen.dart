@@ -348,8 +348,9 @@ class _SignupScreenState extends State<SignupScreen> {
                         tooltip: 'Enter a valid email address',
                         icon: Icons.email,
                         keyboardType: TextInputType.emailAddress,
-                        maxLength: 40,
-                        helperText: 'Maximum 40 characters',
+                        maxLength: Validators.maxEmailLength,
+                        showCounter: true,
+                        helperText: 'Maximum 254 characters',
                         validateOnBlur: true,
                         validator: Validators.email,
                       ),
@@ -591,4 +592,4 @@ class _CountryPhoneInputFormatter extends TextInputFormatter {
 
     return newValue;
   }
-}
+}

@@ -11,6 +11,9 @@ class NeonTextField extends StatefulWidget {
   final IconData icon;
   final bool isPassword;
   final int? maxLength;
+
+  /// Shows a live "12/254" character counter under the field.
+  final bool showCounter;
   final String? helperText;
   final TextInputType keyboardType;
   final List<TextInputFormatter>? inputFormatters;
@@ -28,6 +31,7 @@ class NeonTextField extends StatefulWidget {
     required this.icon,
     this.isPassword = false,
     this.maxLength,
+    this.showCounter = false,
     this.helperText,
     this.keyboardType = TextInputType.text,
     this.inputFormatters,
@@ -120,7 +124,11 @@ class _NeonTextFieldState extends State<NeonTextField> {
             color: Colors.white54,
             fontSize: 11,
           ),
-          counterText: '',
+          counterText: widget.showCounter ? null : '',
+          counterStyle: const TextStyle(
+            color: Colors.white54,
+            fontSize: 11,
+          ),
           filled: true,
           fillColor: const Color(0x337B2FF7),
           prefixIcon: Icon(
@@ -151,4 +159,4 @@ class _NeonTextFieldState extends State<NeonTextField> {
       ),
     );
   }
-}
+}

@@ -237,9 +237,13 @@ class _LoginScreenState extends State<LoginScreen> {
                           icon: Icons.email,
                           keyboardType:
                           TextInputType.emailAddress,
-                          maxLength: 40,
+                          maxLength: Validators.maxEmailLength,
+                          showCounter: true,
+                          helperText: 'Maximum 254 characters',
                           inputFormatters: [
-                            LengthLimitingTextInputFormatter(40),
+                            LengthLimitingTextInputFormatter(
+                              Validators.maxEmailLength,
+                            ),
                           ],
                           validateOnBlur: true,
                           validator: Validators.email,
@@ -341,4 +345,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
+}
