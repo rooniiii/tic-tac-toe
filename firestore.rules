@@ -14,7 +14,12 @@ rules_version = '2';
 //                        Must always match the player's real player_stats.
 //   admin_logs/{id}      Record of every admin action. Admin-only, and
 //                        entries can never be changed or deleted.
+//   ads/{id}             Advertisements shown in the game with a countdown
+//                        (15 s by default). Managed by admins, read-only
+//                        for signed-in players.
 //
+// Every text field written by a client has a maximum size, so oversized
+// documents (memory / quota abuse) are rejected by the server.
 // Anything not listed here is denied.
 
 service cloud.firestore {
@@ -82,8 +87,34 @@ service cloud.firestore {
       allow create: if isAdmin()
         && request.resource.data.adminUid == request.auth.uid
         && request.resource.data.action is string
+        && request.resource.data.action.size() <= 50
+        && request.resource.data.get('details', '').size() <= 1000
+        && request.resource.data.get('targetName', '').size() <= 200
         && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
+    }
+
+    // ---------- advertisements ----------
+
+    match /ads/{adId} {
+      // The game loads active ads; any signed-in player may read them.
+      allow read: if signedIn();
+
+      allow create, update: if isAdmin() && validAd(request.resource.data);
+      allow delete: if isAdmin();
+
+      function validAd(d) {
+        return d.keys().hasOnly(
+                 ['title', 'message', 'imageUrl', 'countdownSeconds', 'active',
+                  'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && d.title is string && d.title.size() > 0 && d.title.size() <= 60
+          && d.get('message', '') is string && d.get('message', '').size() <= 200
+          && d.get('imageUrl', '') is string && d.get('imageUrl', '').size() <= 500
+          && (d.get('imageUrl', '') == '' || d.get('imageUrl', '').matches('https://.+'))
+          && d.countdownSeconds is int
+          && d.countdownSeconds >= 5 && d.countdownSeconds <= 60
+          && d.active is bool;
+      }
     }
 
     // ---------- players ----------

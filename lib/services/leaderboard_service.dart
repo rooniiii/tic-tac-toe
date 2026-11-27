@@ -46,7 +46,7 @@ class LeaderboardEntry {
 /// and totals. The security rules check that these totals match the
 /// player's real `player_stats`, so they cannot be faked.
 class LeaderboardService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   CollectionReference<Map<String, dynamic>> get _leaderboard =>
       _firestore.collection('leaderboard');

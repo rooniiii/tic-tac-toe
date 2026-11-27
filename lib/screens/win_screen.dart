@@ -9,6 +9,9 @@ import '../theme/app_theme.dart';
 import '../widgets/neon_button.dart';
 import '../services/audio_service.dart';
 import '../services/voice_assistant_service.dart';
+import '../services/house_ad_service.dart';
+import '../logic/level_progress_service.dart';
+import 'ad_countdown_screen.dart';
 import 'game_screen.dart';
 import 'menu_screen.dart';
 
@@ -41,7 +44,19 @@ class _WinScreenState extends State<WinScreen>
   late final AnimationController _confettiController;
   late final List<_ConfettiPiece> _pieces;
 
+  bool _navigating = false;
+
+  /// The player just won the very last level (1000).
+  bool get _finishedAllLevels => widget.level >= LevelProgressService.maxLevel;
+
   String get _resultText {
+    if (_finishedAllLevels) {
+      return 'CONGRATULATIONS! You completed all '
+          '${LevelProgressService.maxLevel} levels'
+          '${widget.vsComputer ? ' on ${widget.difficulty.label}' : ''}! '
+          'Final score: ${widget.score}';
+    }
+
     final winner = widget.winnerName;
 
     final winnerText =
@@ -109,7 +124,10 @@ class _WinScreenState extends State<WinScreen>
     super.dispose();
   }
 
-  void _nextLevel() {
+  Future<void> _nextLevel() async {
+    if (_navigating || _finishedAllLevels) return;
+    _navigating = true;
+
     AudioService.playButtonSound();
 
     // Speak only the button's visible label.
@@ -117,13 +135,26 @@ class _WinScreenState extends State<WinScreen>
       VoiceAssistantService.instance.speak('NEXT LEVEL'),
     );
 
+    final nextLevel = LevelProgressService.clamp(widget.level + 1);
+
+    // Every few levels an admin-managed ad plays with its countdown.
+    final ads = HouseAdService.instance;
+    if (ads.shouldShowBeforeLevel(nextLevel)) {
+      final ad = await ads.pickAd();
+      if (!mounted) return;
+      if (ad != null) {
+        await AdCountdownScreen.show(context, ad);
+        if (!mounted) return;
+      }
+    }
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (_) => GameScreen(
           user: widget.user,
           difficulty: widget.difficulty,
-          level: widget.level + 1,
+          level: nextLevel,
           score: widget.score,
           vsComputer: widget.vsComputer,
           opponentUser: widget.opponentUser,
@@ -133,11 +164,16 @@ class _WinScreenState extends State<WinScreen>
   }
 
   void _goToMenu() {
+    if (_navigating) return;
+    _navigating = true;
+
     AudioService.playButtonSound();
 
     // Speak only the button's visible label.
     unawaited(
-      VoiceAssistantService.instance.speak('MAIN MENU'),
+      VoiceAssistantService.instance.speak(
+        _finishedAllLevels ? 'RETURN TO HOME' : 'MAIN MENU',
+      ),
     );
 
     Navigator.pushAndRemoveUntil(
@@ -174,10 +210,10 @@ class _WinScreenState extends State<WinScreen>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'CONGRATULATIONS!',
+                    Text(
+                      _finishedAllLevels ? 'CHAMPION!' : 'CONGRATULATIONS!',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.neonYellow,
@@ -188,11 +224,30 @@ class _WinScreenState extends State<WinScreen>
                     if (widget.winnerName != null)
                       Text('${widget.winnerName} won the game!'),
 
-                    Text(
-                      'You completed Level ${widget.level}'
-                          '${widget.vsComputer ? ' (${widget.difficulty.label})' : ''}',
-                      textAlign: TextAlign.center,
-                    ),
+                    if (_finishedAllLevels) ...[
+                      Text(
+                        'You completed all ${LevelProgressService.maxLevel} '
+                        'levels${widget.vsComputer ? ' on ${widget.difficulty.label}' : ''}!',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          color: AppTheme.neonPink,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Your next game starts again from Level 1.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ] else
+                      Text(
+                        'You completed Level ${widget.level} of '
+                            '${LevelProgressService.maxLevel}'
+                            '${widget.vsComputer ? ' (${widget.difficulty.label})' : ''}',
+                        textAlign: TextAlign.center,
+                      ),
 
                     const SizedBox(height: 6),
                     Text(
@@ -204,15 +259,16 @@ class _WinScreenState extends State<WinScreen>
                     ),
                     const SizedBox(height: 36),
 
-                    NeonButton(
-                      text: 'NEXT LEVEL',
-                      onPressed: _nextLevel,
-                    ),
+                    if (!_finishedAllLevels) ...[
+                      NeonButton(
+                        text: 'NEXT LEVEL',
+                        onPressed: _nextLevel,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
 
-                    const SizedBox(height: 14),
-
                     NeonButton(
-                      text: 'MAIN MENU',
+                      text: _finishedAllLevels ? 'RETURN TO HOME' : 'MAIN MENU',
                       color: AppTheme.neonCyan,
                       onPressed: _goToMenu,
                     ),

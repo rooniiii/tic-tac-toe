@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import '../logic/auth_service.dart';
 import '../logic/profile_service.dart';
 import '../logic/settings_service.dart';
+import '../logic/onboarding_service.dart';
+import '../logic/level_progress_service.dart';
+import '../services/house_ad_service.dart';
+import 'ai_assistant_screen.dart';
 import '../services/audio_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../services/rewarded_ad_service.dart';
@@ -34,8 +38,12 @@ class _MenuScreenState extends State<MenuScreen> {
   final _settings = SettingsService.instance;
   final _profile = ProfileService();
 
+  final _levels = LevelProgressService();
+  final _onboarding = OnboardingService();
+
   String _bio = '';
   UserStats _stats = const UserStats();
+  int _currentLevel = 1;
 
   bool _settingsReady = false;
 
@@ -43,11 +51,51 @@ class _MenuScreenState extends State<MenuScreen> {
   void initState() {
     super.initState();
 
-    // Preload rewarded ad in the background.
+    // Preload rewarded ad and admin-managed ads in the background.
     RewardedAdService().loadAd();
+    HouseAdService.instance.preload();
 
     _loadSettings();
     _loadProfile();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowOnboarding());
+  }
+
+  /// First login on this device: show the introductory walkthrough once.
+  Future<void> _maybeShowOnboarding() async {
+    if (!await _onboarding.shouldShow(widget.user.phone)) return;
+    await _onboarding.markDone(widget.user.phone);
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TutorialScreen(firstRun: true)),
+    );
+  }
+
+  Future<void> _loadLevel() async {
+    final level = await _levels.currentLevel(widget.user.phone, _difficulty);
+    if (!mounted) return;
+    setState(() => _currentLevel = level);
+  }
+
+  Future<void> _openAssistant() async {
+    AudioService.playButtonSound();
+    _announce('AI Assistant');
+
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AiAssistantScreen()),
+    );
+  }
+
+  Future<void> _replayIntro() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TutorialScreen(firstRun: true)),
+    );
   }
 
   Future<void> _loadSettings() async {
@@ -75,6 +123,7 @@ class _MenuScreenState extends State<MenuScreen> {
   Future<void> _loadProfile() async {
     final bio = await _profile.getBio(widget.user.phone);
     final stats = await _profile.getStats(widget.user.phone);
+    await _loadLevel();
 
     if (!mounted) return;
 
@@ -181,6 +230,7 @@ class _MenuScreenState extends State<MenuScreen> {
           'Settings',
           style: TextStyle(color: AppTheme.neonYellow),
         ),
+        scrollable: true,
         content: ListenableBuilder(
           listenable: _settings,
           builder: (context, _) => Column(
@@ -221,6 +271,18 @@ class _MenuScreenState extends State<MenuScreen> {
                   if (value) {
                     _announce('Voice Assistant');
                   }
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.slideshow,
+                  color: AppTheme.neonYellow,
+                ),
+                title: const Text('Replay introduction'),
+                onTap: () {
+                  AudioService.playButtonSound();
+                  Navigator.pop(dialogContext);
+                  _replayIntro();
                 },
               ),
               const Divider(color: Colors.white24),
@@ -390,6 +452,7 @@ class _MenuScreenState extends State<MenuScreen> {
     });
 
     _announce(difficulty.label);
+    _loadLevel();
   }
 
   Future<void> _startGame() async {
@@ -407,6 +470,9 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       ),
     );
+
+    // Progress may have changed while playing.
+    _loadLevel();
   }
 
   Widget _topIcon(
@@ -625,6 +691,12 @@ class _MenuScreenState extends State<MenuScreen> {
                   _logoutButton(),
                   const Spacer(),
                   _topIcon(
+                    'AI Assistant',
+                    Icons.smart_toy_outlined,
+                    AppTheme.neonPink,
+                    _openAssistant,
+                  ),
+                  _topIcon(
                     'Leaderboard',
                     Icons.leaderboard,
                     AppTheme.neonCyan,
@@ -681,7 +753,19 @@ class _MenuScreenState extends State<MenuScreen> {
                             _difficultyButton(Difficulty.hard),
                           ],
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 10),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            '${_difficulty.label}: Level $_currentLevel of '
+                            '${LevelProgressService.maxLevel}',
+                            style: const TextStyle(
+                              color: AppTheme.neonYellow,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
 
                         NeonButton(
                           text: 'PLAY',
@@ -780,6 +864,36 @@ class _MenuScreenState extends State<MenuScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: _openAssistant,
+                            icon: const Icon(
+                              Icons.smart_toy_outlined,
+                              color: AppTheme.neonYellow,
+                              size: 20,
+                            ),
+                            label: const Text(
+                              'ASK THE AI ASSISTANT',
+                              style: TextStyle(
+                                color: AppTheme.neonYellow,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: AppTheme.neonYellow,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -822,6 +936,7 @@ class _EditBioDialogState extends State<_EditBioDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       backgroundColor: AppTheme.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -880,6 +995,7 @@ class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       backgroundColor: AppTheme.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),

@@ -1,10 +1,16 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import '../services/voice_assistant_service.dart';
 
+/// "How to play" pages. With [firstRun] it is the introductory walkthrough
+/// shown once to new players, with extra pages about levels, gestures and
+/// the AI assistant.
 class TutorialScreen extends StatefulWidget {
-  const TutorialScreen({super.key});
+  final bool firstRun;
+
+  const TutorialScreen({super.key, this.firstRun = false});
 
   @override
   State<TutorialScreen> createState() => _TutorialScreenState();
@@ -22,7 +28,40 @@ class _TutorialScreenState extends State<TutorialScreen> {
   static const Color purple = Color(0xFF7B2FF7);
   static const Color yellow = Color(0xFFFFD740);
 
-  final List<Map<String, dynamic>> tutorialPages = [
+  static const List<Map<String, dynamic>> _firstRunPages = [
+    {
+      'title': '1000 LEVELS',
+      'description':
+      'Every difficulty has 1000 levels. Win to unlock the next one. '
+          'Your progress is saved, and level 1000 crowns you champion!',
+      'type': 'levels',
+      'color': yellow,
+    },
+    {
+      'title': 'QUICK GESTURES',
+      'description':
+      'On the board: swipe left to Undo, swipe right for a Hint. '
+          'Double-tap the top bar to hear the game status.',
+      'type': 'gestures',
+      'color': pink,
+    },
+    {
+      'title': 'ASK THE AI ASSISTANT',
+      'description':
+      'Stuck? Open the AI Assistant from the main menu and ask about '
+          'rules, strategy or the app.',
+      'type': 'ai',
+      'color': cyan,
+    },
+  ];
+
+  late final List<Map<String, dynamic>> tutorialPages = [
+    ..._basePages.take(3),
+    if (widget.firstRun) ..._firstRunPages,
+    _basePages.last,
+  ];
+
+  static const List<Map<String, dynamic>> _basePages = [
     {
       'title': 'WELCOME TO NEON XO',
       'description':
@@ -203,7 +242,47 @@ class _TutorialScreenState extends State<TutorialScreen> {
     );
   }
 
+  Widget _featureIcon(IconData icon, Color color, String caption) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 200,
+          height: 200,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withOpacity(0.08),
+            border: Border.all(color: color, width: 2),
+            boxShadow: [
+              BoxShadow(color: color.withOpacity(0.35), blurRadius: 30),
+            ],
+          ),
+          child: Icon(icon, size: 100, color: color),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          caption,
+          style: TextStyle(
+            color: color,
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _visual(String type) {
+    switch (type) {
+      case 'levels':
+        return _featureIcon(Icons.emoji_events, yellow, '1  →  1000');
+      case 'gestures':
+        return _featureIcon(Icons.swipe, pink, 'SWIPE • DOUBLE-TAP');
+      case 'ai':
+        return _featureIcon(Icons.smart_toy, cyan, 'ASK ANYTHING');
+    }
+
     if (type == 'play') {
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -261,6 +340,23 @@ class _TutorialScreenState extends State<TutorialScreen> {
   }
 
   Widget _pageContent(Map<String, dynamic> item) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The picture shrinks on short screens and the page scrolls if
+        // needed, so the content can never overflow at the bottom.
+        final visualHeight = min(constraints.maxHeight * 0.48, 380.0);
+
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: _pageColumn(item, visualHeight),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _pageColumn(Map<String, dynamic> item, double visualHeight) {
     final type = item['type'] as String;
     final color = item['color'] as Color;
 
@@ -274,8 +370,8 @@ class _TutorialScreenState extends State<TutorialScreen> {
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: purple.withOpacity(0.55)),
           ),
-          child: const Text(
-            'NEON XO  •  HOW TO PLAY',
+          child: Text(
+            widget.firstRun ? 'WELCOME  •  GETTING STARTED' : 'NEON XO  •  HOW TO PLAY',
             style: TextStyle(
               color: cyan,
               fontSize: 11,
@@ -284,9 +380,14 @@ class _TutorialScreenState extends State<TutorialScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 25),
-        _visual(type),
-        const SizedBox(height: 30),
+        const SizedBox(height: 20),
+        ExcludeSemantics(
+          child: SizedBox(
+            height: visualHeight,
+            child: FittedBox(child: _visual(type)),
+          ),
+        ),
+        const SizedBox(height: 24),
         Text(
           item['title'] as String,
           textAlign: TextAlign.center,
@@ -390,7 +491,10 @@ class _TutorialScreenState extends State<TutorialScreen> {
                       },
                     ),
                   ),
-                  Row(
+                  Semantics(
+                    label: 'Page ${currentPage + 1} of ${tutorialPages.length}. '
+                        'Swipe left or right to change page.',
+                    child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
                       tutorialPages.length,
@@ -416,7 +520,8 @@ class _TutorialScreenState extends State<TutorialScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 25),
+                  ),
+                  const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
                     height: 56,

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/difficulty.dart';
 import '../models/mark.dart';
 import '../models/user.dart';
+import '../logic/level_progress_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/board_widget.dart';
 import '../services/audio_service.dart';
@@ -32,7 +33,7 @@ class ModeScreen extends StatelessWidget {
     unawaited(VoiceAssistantService.instance.speak(text));
   }
 
-  void _start(BuildContext context, bool vsComputer) {
+  Future<void> _start(BuildContext context, bool vsComputer) async {
     AudioService.playButtonSound();
 
     final label = vsComputer ? 'VS COMPUTER' : 'VS FRIEND';
@@ -41,13 +42,19 @@ class ModeScreen extends StatelessWidget {
     if (!context.mounted) return;
 
     if (vsComputer) {
+      // Continue from the saved level of this difficulty (1 for new players).
+      final level =
+          await LevelProgressService().currentLevel(user.phone, difficulty);
+
+      if (!context.mounted) return;
+
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (_) => GameScreen(
             user: user,
             difficulty: difficulty,
-            level: 1,
+            level: level,
           ),
         ),
       );

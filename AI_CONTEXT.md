@@ -117,7 +117,13 @@ tic-tac-toe/
       neon_text_field.dart     styled TextFormField (maxLength, showCounter,
                                validateOnBlur, tooltip, password toggle)
       password_checklist.dart  live password rules at sign-up
-  test/widget_test.dart        default template test only
+  test/                        `flutter test` (no Firebase/device needed):
+    widget_test.dart           smoke: MyApp → splash → login
+    game_logic_test.dart       GameLogic, computers, Hard never loses
+    auth_helpers_test.dart     Validators, PasswordHasher, limiter, stats
+    new_features_test.dart     levels, session, sanitizer, house ads
+    widgets_test.dart          BoardWidget semantics, ad countdown
+    layout_overflow_test.dart  tutorial fits small/landscape screens
 ```
 
 ---------------------------------------------------------------------------
@@ -366,7 +372,9 @@ Admins are created from the admin app via a **second FirebaseApp instance**
 - Only Android configured; iOS/web/windows would crash at Firebase init.
 - `functions/` and `functions_admin/` are empty templates; `firebase.json`
   still lists them, so never run plain `firebase deploy`.
-- Tests: only the default widget test. Good candidates: `GameLogic`,
+- Tests: see `test/` (unit + widget). Still missing: Firestore rules
+  tests with the emulator, and GameScreen/MenuScreen widget tests (they need
+  Firebase/AdMob fakes). Earlier candidates were `GameLogic`,
   `HardComputer` (never loses), `Validators`, `PasswordHasher`, rules tests
   with the Firebase emulator.
 - `User`/`AdminUser` local model and `ensureAdminExists()` are legacy from a
@@ -386,3 +394,70 @@ flutter run
 firebase deploy --only firestore:rules   # from this folder
 ```
 Firebase console needs: Authentication → Email/Password enabled.
+
+---------------------------------------------------------------------------
+## 14. Features added 2026-11-27
+---------------------------------------------------------------------------
+
+**Level progression (`logic/level_progress_service.dart`)** – 1000 levels
+per difficulty (`LevelProgressService.maxLevel`). Progress is saved in
+prefs `level_<phone>_<difficulty>`; `ModeScreen` starts VS COMPUTER at the
+saved level (1 for new players). `GameScreen` calls `recordWin` on a win
+(never moves progress backwards). Winning level 1000 resets progress to 1,
+increments `level_done_<phone>_<difficulty>`, and `WinScreen` shows the
+"CHAMPION!" screen with only a RETURN TO HOME button.
+
+**Admin-managed ads (`services/house_ad_service.dart`,
+`screens/ad_countdown_screen.dart`)** – Firestore `ads` collection
+(title ≤ 60, message ≤ 200, imageUrl https ≤ 500, countdownSeconds 5–60,
+default 15, active). The game reads `where active == true` (cached 10 min)
+and shows a full-screen ad with a countdown; CONTINUE / system back unlock
+at 0. Shown (a) before every 3rd level (`shouldShowBeforeLevel`) and (b) as
+the fallback reward for "+1 UNDO" when no AdMob ad is loaded (reward only
+when watched fully).
+
+**Session (`logic/auth/session_manager.dart`)** – device session "cookie":
+random 256-bit token + issued/last-active time in prefs. Expires after 30
+days total or 14 days idle → `restoreSession` logs out and returns
+`AuthService.sessionExpiredMessage`. Old sessions without a token are
+upgraded, not kicked out. Logout / account deletion clear it.
+
+**Onboarding (`logic/onboarding_service.dart`)** – first time a player
+reaches the menu on a device (`onboarding_done_<phone>`), `TutorialScreen(
+firstRun: true)` is shown: the 4 how-to-play pages plus pages on levels,
+gestures and the AI assistant. Replay: Settings → "Replay introduction".
+
+**AI assistant (`services/ai_assistant_service.dart`,
+`screens/ai_assistant_screen.dart`)** – Groq chat completions
+(`https://api.groq.com/openai/v1/chat/completions`) via `dart:io`
+HttpClient (no new package). Key/model from build defines:
+`flutter run --dart-define=GROQ_API_KEY=gsk_... [--dart-define=GROQ_MODEL=...]`
+(default model `llama-3.1-8b-instant`). Never commit the key. Limits:
+local 10 req/min and 3 s gap; HTTP 429 → friendly message with the
+`retry-after` wait and a visible cooldown; other errors mapped to friendly
+text. Input ≤ 500 chars, last 10 messages sent. NOTE: a key inside an APK
+can be extracted; for production, route calls through a server.
+
+**Accessibility / gestures** – board cells have Semantics labels ("Row 1,
+column 2, empty"); tools have Semantics; status is a live region. Game
+board: swipe left = Undo, swipe right = Hint; double-tap the top bar =
+speak + show status. Tutorial pages are swipeable with a page-indicator
+label.
+
+**Bottom overflow fix** – `TutorialScreen` page content was a fixed
+~600 px Column inside an Expanded PageView (overflowed 73 px on 360×640).
+Now a LayoutBuilder + scroll view with a height-scaled picture.
+`GameScreen` computes the board size from free space and can scroll. Menu
+dialogs use `scrollable: true`. Regression test:
+`test/layout_overflow_test.dart`; unit tests: `test/new_features_test.dart`.
+
+**Security** – `logic/input_sanitizer.dart` (control chars removed, hard
+length limits, https-only URLs). Rules: `ads` validated (keys, types,
+sizes); `admin_logs` text sizes capped. Transport is HTTPS/TLS (Firebase,
+Groq); Firestore/Drift take parameters, never query strings, so SQL
+injection is not possible. **Redeploy rules after this change.**
+
+**Testability** – Firebase instances in services are `late final` (lazy),
+so widgets can be built in tests without `Firebase.initializeApp`; in the
+app Firebase is always initialised before first use. Keep new service
+fields lazy too.

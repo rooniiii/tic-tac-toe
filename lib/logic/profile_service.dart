@@ -13,7 +13,7 @@ class ProfileService {
   final FirebaseFirestore _firestore =
       FirebaseFirestore.instance;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  late final FirebaseAuth _auth = FirebaseAuth.instance;
 
   static const int maxBioLength = 40;
 

@@ -13,6 +13,7 @@ import '../services/leaderboard_service.dart';
 import 'auth/login_attempt_limiter.dart';
 import 'auth/offline_credentials_store.dart';
 import 'auth/password_hasher.dart';
+import 'auth/session_manager.dart';
 
 class LoginResult {
   final User? user;
@@ -35,8 +36,8 @@ class AuthService {
   static const String _activeSessionKey = 'active_session_email';
 
   final AppDatabase _db = AppDatabase.instance;
-  final firebase.FirebaseAuth _firebaseAuth = firebase.FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late final firebase.FirebaseAuth _firebaseAuth = firebase.FirebaseAuth.instance;
+  late final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final LoginAttemptLimiter _limiter = LoginAttemptLimiter();
 
   late final OfflineCredentialsStore _offline = OfflineCredentialsStore(_db);
@@ -71,9 +72,42 @@ class AuthService {
     );
   }
 
-  Future<void> _saveActiveSession(String email) async {
+  /// Remembers who is logged in on this device. [newSession] issues a new
+  /// session token (fresh login); otherwise the existing session is only
+  /// marked as active (app restart).
+  Future<void> _saveActiveSession(
+    String email, {
+    bool newSession = true,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_activeSessionKey, email.trim().toLowerCase());
+
+    if (newSession) {
+      await SessionManager.instance.start();
+    } else {
+      await SessionManager.instance.touch();
+    }
+  }
+
+  static const String sessionExpiredMessage =
+      'Your session has expired. Please log in again.';
+
+  /// Checks the device session before it is restored. Returns false (and
+  /// logs out) when it expired. Sessions from older app versions without a
+  /// token are upgraded to a new session.
+  Future<bool> _sessionStillValid() async {
+    final state = await SessionManager.instance.check();
+
+    switch (state) {
+      case SessionState.valid:
+        return true;
+      case SessionState.missing:
+        await SessionManager.instance.start();
+        return true;
+      case SessionState.expired:
+        await logout();
+        return false;
+    }
   }
 
   User _toUser(AppUser data) {
@@ -117,6 +151,7 @@ class AuthService {
     } finally {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_activeSessionKey);
+      await SessionManager.instance.clear();
     }
   }
 
@@ -125,6 +160,14 @@ class AuthService {
   // ---------------------------------------------------------------------------
 
   Future<LoginResult> restoreSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSession = _firebaseAuth.currentUser != null ||
+        (prefs.getString(_activeSessionKey)?.isNotEmpty ?? false);
+
+    if (hasSession && !await _sessionStillValid()) {
+      return const LoginResult.failure(sessionExpiredMessage);
+    }
+
     final firebaseUser = _firebaseAuth.currentUser;
 
     if (firebaseUser == null) {
@@ -184,7 +227,7 @@ class AuthService {
         );
       }
 
-      await _saveActiveSession(email);
+      await _saveActiveSession(email, newSession: false);
       _onOnlineSessionStarted();
 
       return LoginResult.success(_toUser(localUser));
@@ -228,6 +271,8 @@ class AuthService {
         await prefs.remove(_activeSessionKey);
         return const LoginResult.failure('Local player profile not found.');
       }
+
+      await SessionManager.instance.touch();
 
       if (_firebaseAuth.currentUser != null) {
         AccountStatusService.instance.startWatching();
@@ -816,6 +861,7 @@ class AuthService {
       await _limiter.clear(email);
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_activeSessionKey);
+      await SessionManager.instance.clear();
     } catch (e) {
       if (kDebugMode) debugPrint('Local cleanup after delete failed: $e');
     }

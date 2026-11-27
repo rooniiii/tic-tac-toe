@@ -19,10 +19,24 @@ class BoardWidget extends StatelessWidget {
   static Color colorOf(Mark m) =>
       m == Mark.x ? AppTheme.neonCyan : AppTheme.neonPink;
 
+  /// Spoken by screen readers (TalkBack), e.g. "Row 1, column 2, empty".
+  String _cellLabel(int i, Mark? m, bool isHint) {
+    final position = 'Row ${i ~/ 3 + 1}, column ${i % 3 + 1}';
+    final content = m == null ? 'empty' : m.symbol;
+    final hint = isHint ? ', suggested move' : '';
+    return '$position, $content$hint';
+  }
+
   Widget _cell(int i) {
     final m = board[i];
     final isHint = hintCell == i;
-    return GestureDetector(
+    return Semantics(
+      button: m == null,
+      label: _cellLabel(i, m, isHint),
+      hint: m == null ? 'Double tap to place your mark' : null,
+      excludeSemantics: true,
+      onTap: m == null ? () => onTap(i) : null,
+      child: GestureDetector(
       onTap: () => onTap(i),
       child: Container(
         decoration: BoxDecoration(
@@ -67,6 +81,7 @@ class BoardWidget extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

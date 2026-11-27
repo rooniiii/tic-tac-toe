@@ -8,7 +8,7 @@ class FirestoreSyncService {
   final FirebaseFirestore _firestore =
       FirebaseFirestore.instance;
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  late final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<void> syncGameResult({
     required String opponentType,
