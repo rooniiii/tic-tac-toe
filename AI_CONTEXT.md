@@ -431,7 +431,11 @@ gestures and the AI assistant. Replay: Settings → "Replay introduction".
 `screens/ai_assistant_screen.dart`)** – Groq chat completions
 (`https://api.groq.com/openai/v1/chat/completions`) via `dart:io`
 HttpClient (no new package). Key/model from build defines:
-`flutter run --dart-define=GROQ_API_KEY=gsk_... [--dart-define=GROQ_MODEL=...]`
+`secrets.json` in the project root (git-ignored; template
+`secrets.example.json`: `{"GROQ_API_KEY": "...", "GROQ_MODEL": "..."}`).
+VS Code: `.vscode/launch.json` passes `--dart-define-from-file=secrets.json`
+on Run/F5. Terminal: `flutter run --dart-define-from-file=secrets.json`
+(same flag for `flutter build apk`).
 (default model `llama-3.1-8b-instant`). Never commit the key. Limits:
 local 10 req/min and 3 s gap; HTTP 429 → friendly message with the
 `retry-after` wait and a visible cooldown; other errors mapped to friendly

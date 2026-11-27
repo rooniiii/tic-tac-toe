@@ -158,8 +158,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
               const _Banner(
                 icon: Icons.info_outline,
                 color: AppTheme.neonYellow,
-                text: 'The assistant needs a Groq API key. Build the app with '
-                    '--dart-define=GROQ_API_KEY=your_key',
+                text: 'The assistant needs a Groq API key. Put it in '
+                    'secrets.json and run with --dart-define-from-file='
+                    'secrets.json (VS Code does this automatically).',
               ),
             Expanded(
               child: ListView.builder(

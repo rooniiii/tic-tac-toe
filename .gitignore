@@ -48,3 +48,6 @@ app.*.map.json
 neon_crash_log.txt
 neon_errors_only.txt
 *.log
+
+# Local API keys (copy secrets.example.json to secrets.json). Never commit.
+secrets.json

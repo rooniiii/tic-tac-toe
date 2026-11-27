@@ -32,9 +32,12 @@ class AssistantException implements Exception {
 /// AI helper powered by the free tier of the Groq API
 /// (OpenAI-compatible chat completions endpoint).
 ///
-/// The API key is NOT stored in the source code. Pass it at build time:
-///   flutter run --dart-define=GROQ_API_KEY=gsk_xxx
-/// Optionally choose the model: --dart-define=GROQ_MODEL=llama-3.1-8b-instant
+/// The API key is NOT stored in the source code. It is read at build time
+/// from `secrets.json` in the project folder (git-ignored; copy
+/// `secrets.example.json`). VS Code passes it automatically through
+/// `.vscode/launch.json`; from a terminal use:
+///   flutter run --dart-define-from-file=secrets.json
+/// Optionally add "GROQ_MODEL" to the same file (default llama-3.1-8b-instant).
 ///
 /// Free-tier limits are protected twice:
 ///   1. On the device: at most [_maxRequestsPerMinute] requests per minute and
