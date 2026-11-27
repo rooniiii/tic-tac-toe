@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "NEON XO (debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=secrets.json"]
+    },
+    {
+      "name": "NEON XO (release)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=secrets.json"]
+    }
+  ]
+}

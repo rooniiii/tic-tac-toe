@@ -1,0 +1,243 @@
+rules_version = '2';
+
+// Firestore security rules shared by the NEON XO game app and the Admin app.
+//
+// Collections:
+//   admins/{uid}         Admin accounts (role: 'admin'). Admin-only.
+//   users/{uid}          Player profile. Admins block via isBlocked/status.
+//   player_stats/{uid}   Player win/loss totals, written by the game.
+//   game_history/{id}    One document per finished game.
+//   user_profiles/{uid}  Player bio.
+//   deleted_users/{uid}  Marker written when an Admin deletes a player, so
+//                        that login cannot re-create a profile. Admin-only.
+//   leaderboard/{uid}    Public name + totals for the global leaderboard.
+//                        Must always match the player's real player_stats.
+//   admin_logs/{id}      Record of every admin action. Admin-only, and
+//                        entries can never be changed or deleted.
+//   ads/{id}             Advertisements shown in the game with a countdown
+//                        (15 s by default). Managed by admins, read-only
+//                        for signed-in players.
+//
+// Every text field written by a client has a maximum size, so oversized
+// documents (memory / quota abuse) are rejected by the server.
+// Anything not listed here is denied.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function profilePath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function isBlocked() {
+      return exists(profilePath())
+        && (get(profilePath()).data.get('isBlocked', false) == true
+            || get(profilePath()).data.get('status', 'active') == 'blocked');
+    }
+
+    // Signed-in player whose profile exists (not deleted by an admin) and
+    // who has not been blocked.
+    function activePlayer() {
+      return signedIn() && exists(profilePath()) && !isBlocked();
+    }
+
+    // Longest email allowed by the email standard (same limit as the apps).
+    function validEmail(value) {
+      return value is string && value.size() <= 254;
+    }
+
+    // Fields only an Admin may set or change on users/{uid}.
+    function adminOnlyUserFields() {
+      return ['isBlocked', 'status', 'blockedAt', 'blockedBy',
+              'uid', 'email', 'emailVerificationRequired'];
+    }
+
+    // ---------- admins ----------
+
+    match /admins/{uid} {
+      // Each account may read its own record (the Admin login check).
+      allow read: if isOwner(uid) || isAdmin();
+      allow create, update: if isAdmin()
+        && validEmail(request.resource.data.get('email', ''));
+      allow delete: if isAdmin();
+    }
+
+    match /deleted_users/{uid} {
+      allow read, write: if isAdmin();
+    }
+
+    match /admin_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.action.size() <= 50
+        && request.resource.data.get('details', '').size() <= 1000
+        && request.resource.data.get('targetName', '').size() <= 200
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // ---------- advertisements ----------
+
+    match /ads/{adId} {
+      // The game loads active ads; any signed-in player may read them.
+      allow read: if signedIn();
+
+      allow create, update: if isAdmin() && validAd(request.resource.data);
+      allow delete: if isAdmin();
+
+      function validAd(d) {
+        return d.keys().hasOnly(
+                 ['title', 'message', 'imageUrl', 'countdownSeconds', 'active',
+                  'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+          && d.title is string && d.title.size() > 0 && d.title.size() <= 60
+          && d.get('message', '') is string && d.get('message', '').size() <= 200
+          && d.get('imageUrl', '') is string && d.get('imageUrl', '').size() <= 500
+          && (d.get('imageUrl', '') == '' || d.get('imageUrl', '').matches('https://.+'))
+          && d.countdownSeconds is int
+          && d.countdownSeconds >= 5 && d.countdownSeconds <= 60
+          && d.active is bool;
+      }
+    }
+
+    // ---------- players ----------
+
+    match /users/{uid} {
+      // A blocked player can still read their own profile, so the game can
+      // show the "account blocked" message.
+      allow read: if isOwner(uid) || isAdmin();
+
+      // Sign-up: the game creates the profile for its own new login.
+      allow create: if isOwner(uid)
+        && !exists(/databases/$(database)/documents/deleted_users/$(uid))
+        && request.resource.data.get('uid', uid) == uid
+        && request.resource.data.get('isBlocked', false) == false
+        && request.resource.data.get('status', 'active') == 'active'
+        && request.resource.data.get('emailVerificationRequired', true) == true
+        && validEmail(request.resource.data.get('email', ''))
+        && !request.resource.data.keys().hasAny(['blockedAt', 'blockedBy']);
+
+      // Players may update their own profile (e.g. emailVerifiedAt) but
+      // never the block / identity fields.
+      allow update: if isAdmin()
+        || (isOwner(uid)
+            && !isBlocked()
+            && !request.resource.data.diff(resource.data)
+                  .affectedKeys().hasAny(adminOnlyUserFields()));
+
+      // Admins, or the player deleting their own (not blocked) account.
+      allow delete: if isAdmin() || (isOwner(uid) && activePlayer());
+    }
+
+    match /player_stats/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      // The game adds exactly one finished game per write:
+      // gamesPlayed +1 and exactly one of wins / losses / draws +1.
+      allow create: if isOwner(uid)
+        && activePlayer()
+        && validStatsKeys()
+        && request.resource.data.gamesPlayed == 1
+        && request.resource.data.get('wins', 0)
+             + request.resource.data.get('losses', 0)
+             + request.resource.data.get('draws', 0) == 1;
+
+      allow update: if isOwner(uid)
+        && activePlayer()
+        && validStatsKeys()
+        && request.resource.data.gamesPlayed
+             == resource.data.get('gamesPlayed', 0) + 1
+        && validStatDelta('wins')
+        && validStatDelta('losses')
+        && validStatDelta('draws')
+        && (request.resource.data.get('wins', 0) - resource.data.get('wins', 0))
+           + (request.resource.data.get('losses', 0) - resource.data.get('losses', 0))
+           + (request.resource.data.get('draws', 0) - resource.data.get('draws', 0)) == 1;
+
+      allow delete: if isAdmin() || (isOwner(uid) && activePlayer());
+
+      function validStatsKeys() {
+        return request.resource.data.keys().hasOnly(
+          ['uid', 'email', 'gamesPlayed', 'wins', 'losses', 'draws', 'updatedAt']);
+      }
+
+      function validStatDelta(field) {
+        return request.resource.data.get(field, 0) - resource.data.get(field, 0) in [0, 1];
+      }
+    }
+
+    match /game_history/{gameId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.player1Uid == request.auth.uid);
+
+      allow create: if activePlayer()
+        && request.resource.data.player1Uid == request.auth.uid
+        && request.resource.data.resultForPlayer1 in ['win', 'loss', 'draw']
+        && request.resource.data.keys().hasOnly(
+             ['player1Uid', 'player1Email', 'opponentType', 'opponentName',
+              'difficulty', 'resultForPlayer1', 'completedAt']);
+
+      allow update: if false;
+      allow delete: if isAdmin()
+        || (activePlayer() && resource.data.player1Uid == request.auth.uid);
+    }
+
+    match /user_profiles/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      allow create, update: if isAdmin()
+        || (isOwner(uid)
+            && activePlayer()
+            && request.resource.data.get('uid', uid) == uid
+            && request.resource.data.get('bio', '') is string
+            && request.resource.data.get('bio', '').size() <= 40
+            && request.resource.data.keys().hasOnly(
+                 ['uid', 'phone', 'bio', 'updatedAt']));
+
+      allow delete: if isAdmin() || (isOwner(uid) && activePlayer());
+    }
+
+    match /leaderboard/{uid} {
+      // Any signed-in player can see the leaderboard. It holds no email.
+      allow read: if signedIn();
+
+      // A player may only copy their OWN real totals and name.
+      allow create, update: if isOwner(uid)
+        && activePlayer()
+        && request.resource.data.keys().hasOnly(
+             ['uid', 'name', 'gamesPlayed', 'wins', 'losses', 'draws', 'updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.name == get(profilePath()).data.get('name', '')
+        && matchesStats(uid, 'gamesPlayed')
+        && matchesStats(uid, 'wins')
+        && matchesStats(uid, 'losses')
+        && matchesStats(uid, 'draws');
+
+      // Admins rename or remove entries (e.g. when blocking a player).
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (isOwner(uid) && activePlayer());
+
+      function matchesStats(uid, field) {
+        return request.resource.data.get(field, 0)
+          == get(/databases/$(database)/documents/player_stats/$(uid)).data.get(field, 0);
+      }
+    }
+  }
+}
