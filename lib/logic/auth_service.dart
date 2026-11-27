@@ -22,12 +22,6 @@ class LoginResult {
   const LoginResult.failure(this.error) : user = null;
 }
 
-/// Player sign-up, login (online and offline), session restore and logout.
-///
-/// Helpers live in `logic/auth/`:
-///  * [PasswordHasher]          – hashing of passwords stored on the device
-///  * [LoginAttemptLimiter]     – temporary lock after wrong passwords
-///  * [OfflineCredentialsStore] – offline login data and the "blocked" flag
 class AuthService {
   static const int maxAttempts = 3;
   static const int lockSeconds = 30;
@@ -41,11 +35,8 @@ class AuthService {
   static const String _activeSessionKey = 'active_session_email';
 
   final AppDatabase _db = AppDatabase.instance;
-
   final firebase.FirebaseAuth _firebaseAuth = firebase.FirebaseAuth.instance;
-
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
   final LoginAttemptLimiter _limiter = LoginAttemptLimiter();
 
   late final OfflineCredentialsStore _offline = OfflineCredentialsStore(_db);
@@ -59,7 +50,6 @@ class AuthService {
   // Small helpers
   // ---------------------------------------------------------------------------
 
-  // Timing logs only appear in debug builds.
   void _logAuthTiming(String action, String step, Stopwatch stopwatch) {
     if (!kDebugMode) return;
     debugPrint(
@@ -67,8 +57,6 @@ class AuthService {
     );
   }
 
-  // Save verified timestamp in the background.
-  // Login does not wait for this network request.
   void _updateEmailVerifiedAtInBackground(String uid) {
     unawaited(
       _firestore
@@ -97,7 +85,6 @@ class AuthService {
     );
   }
 
-  // Only temporary network failures permit offline session restoration.
   bool _isTemporaryFirebaseError(FirebaseException e) {
     return e.code == 'unavailable' ||
         e.code == 'deadline-exceeded' ||
@@ -108,7 +95,6 @@ class AuthService {
   bool _isBlockedProfile(Map<String, dynamic> data) =>
       AccountStatusService.isBlockedData(data);
 
-  // Called after every successful online login / session restore.
   void _onOnlineSessionStarted() {
     AccountStatusService.instance.startWatching();
     unawaited(LeaderboardService().syncMyEntry());
@@ -118,8 +104,6 @@ class AuthService {
   // Blocking and logout
   // ---------------------------------------------------------------------------
 
-  /// Remember the block on this device, remove the cached offline login and
-  /// sign out.
   Future<void> handleBlockedAccount(String email) async {
     await _offline.markBlocked(email);
     await logout();
@@ -137,7 +121,7 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Session restore (app start)
+  // Session restore
   // ---------------------------------------------------------------------------
 
   Future<LoginResult> restoreSession() async {
@@ -245,8 +229,6 @@ class AuthService {
         return const LoginResult.failure('Local player profile not found.');
       }
 
-      // Still signed in to Firebase but offline: watch for a block so it is
-      // applied as soon as the device reconnects.
       if (_firebaseAuth.currentUser != null) {
         AccountStatusService.instance.startWatching();
       }
@@ -288,7 +270,7 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Migration of very old (pre-SQLite) local accounts
+  // Migration
   // ---------------------------------------------------------------------------
 
   Future<void> _migrateOldUsers() async {
@@ -318,11 +300,11 @@ class AuthService {
         if (existingUser == null) {
           await _db
               .createUser(
-                name: data['name'],
-                phone: phone,
-                passwordHash: data['passwordHash'],
-                salt: data['salt'],
-              )
+            name: data['name'],
+            phone: phone,
+            passwordHash: data['passwordHash'],
+            salt: data['salt'],
+          )
               .timeout(const Duration(seconds: 15));
         }
       }
@@ -339,7 +321,6 @@ class AuthService {
   // Sign-up
   // ---------------------------------------------------------------------------
 
-  /// Local-only sign-up (used for local players on this device).
   Future<String?> signUp({
     required String name,
     required String phone,
@@ -360,11 +341,11 @@ class AuthService {
 
       await _db
           .createUser(
-            name: name.trim(),
-            phone: phone,
-            passwordHash: PasswordHasher.hash(password, salt),
-            salt: salt,
-          )
+        name: name.trim(),
+        phone: phone,
+        passwordHash: PasswordHasher.hash(password, salt),
+        salt: salt,
+      )
           .timeout(const Duration(seconds: 15));
 
       return null;
@@ -402,9 +383,9 @@ class AuthService {
 
       final credential = await _firebaseAuth
           .createUserWithEmailAndPassword(
-            email: normalizedEmail,
-            password: password,
-          )
+        email: normalizedEmail,
+        password: password,
+      )
           .timeout(const Duration(seconds: 20));
 
       _logAuthTiming('SIGNUP', 'Firebase account creation completed', timer);
@@ -512,7 +493,7 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Local (phone + password) login for players stored on this device
+  // Local login
   // ---------------------------------------------------------------------------
 
   Future<User?> login({
@@ -531,7 +512,6 @@ class AuthService {
       return null;
     }
 
-    // Re-save hashes from older app versions in the stronger format.
     if (PasswordHasher.needsUpgrade(data.passwordHash)) {
       final salt = PasswordHasher.generateSalt();
       await _db.updateUserPassword(
@@ -589,7 +569,7 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
-  // Firebase (email + password) login
+  // Firebase login
   // ---------------------------------------------------------------------------
 
   Future<LoginResult> loginWithFirebase({
@@ -598,11 +578,20 @@ class AuthService {
   }) async {
     final normalizedEmail = email.trim().toLowerCase();
     final timer = Stopwatch()..start();
+    final stepTimer = Stopwatch()..start();
+
+    void logStep(String step) {
+      _logAuthTiming('LOGIN_STEP', step, stepTimer);
+      stepTimer
+        ..reset()
+        ..start();
+    }
 
     _logAuthTiming('LOGIN', 'Started', timer);
 
     try {
       final lockMessage = await _limiter.checkLock(normalizedEmail);
+      logStep('Login limiter check');
 
       if (lockMessage != null) {
         return LoginResult.failure(lockMessage);
@@ -611,14 +600,14 @@ class AuthService {
       try {
         final credential = await _firebaseAuth
             .signInWithEmailAndPassword(
-              email: normalizedEmail,
-              password: password,
-            )
+          email: normalizedEmail,
+          password: password,
+        )
             .timeout(const Duration(seconds: 20));
 
-        _logAuthTiming('LOGIN', 'Firebase sign-in completed', timer);
+        logStep('Firebase sign-in');
 
-        firebase.User? firebaseUser = credential.user;
+        final firebaseUser = credential.user;
 
         if (firebaseUser == null) {
           return const LoginResult.failure(
@@ -626,8 +615,9 @@ class AuthService {
           );
         }
 
-        await firebaseUser.reload();
-        firebaseUser = _firebaseAuth.currentUser ?? firebaseUser;
+        // Firebase sign-in response already provides the authenticated user.
+        // Avoid an additional reload network request during login.
+        logStep('Firebase user ready');
 
         DocumentSnapshot<Map<String, dynamic>> profile;
 
@@ -638,14 +628,14 @@ class AuthService {
               .get()
               .timeout(const Duration(seconds: 15));
 
-          _logAuthTiming('LOGIN', 'Firestore profile fetch completed', timer);
+          logStep('Firestore profile fetch');
         } on TimeoutException {
-          _logAuthTiming('LOGIN', 'Firestore profile fetch timed out', timer);
+          logStep('Firestore profile timeout');
 
           await _firebaseAuth.signOut();
           return _offlineLogin(normalizedEmail, password);
         } on FirebaseException catch (e) {
-          _logAuthTiming('LOGIN', 'Firestore error: ${e.code}', timer);
+          logStep('Firestore error: ${e.code}');
 
           await _firebaseAuth.signOut();
 
@@ -672,28 +662,32 @@ class AuthService {
           return const LoginResult.failure(blockedMessage);
         }
 
-        // Online check passed: clear any old block remembered on this device.
         await _offline.clearBlocked(normalizedEmail);
+        logStep('Clear offline blocked status');
 
-        final verificationRequired = data['emailVerificationRequired'] == true;
+        final verificationRequired =
+            data['emailVerificationRequired'] == true;
 
         if (verificationRequired && !firebaseUser.emailVerified) {
           try {
             await firebaseUser.sendEmailVerification();
             _logAuthTiming('LOGIN', 'Verification email resent', timer);
           } catch (_) {
-            _logAuthTiming('LOGIN', 'Verification email resend failed', timer);
+            _logAuthTiming(
+              'LOGIN',
+              'Verification email resend failed',
+              timer,
+            );
           }
 
           await _firebaseAuth.signOut();
 
           return const LoginResult.failure(
             'Please verify your email first. We have sent a verification '
-            'link to your inbox. Check your spam folder too.',
+                'link to your inbox. Check your spam folder too.',
           );
         }
 
-        // Only write the timestamp if it does not already exist.
         if (verificationRequired &&
             firebaseUser.emailVerified &&
             data['emailVerifiedAt'] == null) {
@@ -716,8 +710,10 @@ class AuthService {
           password: password,
           name: name,
         );
+        logStep('Offline credentials save');
 
         final localUser = await _db.findUserByPhone(phone);
+        logStep('SQLite user lookup');
 
         if (localUser == null) {
           await _firebaseAuth.signOut();
@@ -727,7 +723,11 @@ class AuthService {
         }
 
         await _limiter.clear(normalizedEmail);
+        logStep('Clear login limiter');
+
         await _saveActiveSession(normalizedEmail);
+        logStep('Save active session');
+
         _onOnlineSessionStarted();
 
         _logAuthTiming('LOGIN', 'TOTAL COMPLETED', timer);
@@ -767,9 +767,6 @@ class AuthService {
   // Delete own account
   // ---------------------------------------------------------------------------
 
-  /// Permanently deletes the signed-in player's account: their data in
-  /// Firestore, their login, and their data on this device.
-  /// Returns null on success, or an error message.
   Future<String?> deleteOwnAccount({
     required String password,
     required String phone,
@@ -782,14 +779,13 @@ class AuthService {
     }
 
     try {
-      // Firebase requires a recent login before deleting an account.
       await user
           .reauthenticateWithCredential(
-            firebase.EmailAuthProvider.credential(
-              email: email,
-              password: password,
-            ),
-          )
+        firebase.EmailAuthProvider.credential(
+          email: email,
+          password: password,
+        ),
+      )
           .timeout(const Duration(seconds: 20));
 
       AccountStatusService.instance.stopWatching();
@@ -814,7 +810,6 @@ class AuthService {
       return 'Account deletion failed: $e';
     }
 
-    // Local data on this device.
     try {
       await deleteUser(phone);
       await _offline.forget(email);
@@ -829,7 +824,6 @@ class AuthService {
   }
 
   Future<void> _deleteFirestoreData(String uid) async {
-    // Game history first (may span several batches).
     const pageSize = 400;
 
     while (true) {
