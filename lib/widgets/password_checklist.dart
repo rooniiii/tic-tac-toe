@@ -32,7 +32,13 @@ class PasswordChecklist extends StatelessWidget {
                     color: color,
                   ),
                   const SizedBox(width: 8),
-                  Text(e.key, style: TextStyle(color: color, fontSize: 13)),
+                  // Wraps on narrow screens / large text instead of overflowing.
+                  Expanded(
+                    child: Text(
+                      e.key,
+                      style: TextStyle(color: color, fontSize: 13),
+                    ),
+                  ),
                 ],
               ),
             );

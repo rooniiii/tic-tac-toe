@@ -107,8 +107,6 @@ class SecurePrefs {
     return value is bool ? value : null;
   }
 
-  bool containsKey(String key) => _values.containsKey(key);
-
   Future<bool> setString(String key, String value) {
     _values[key] = value;
     return _persist();

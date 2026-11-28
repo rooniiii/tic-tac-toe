@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_recognition_error.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import '../logic/settings_service.dart';
 import '../services/ai_assistant_service.dart';
@@ -9,7 +12,9 @@ import '../services/voice_assistant_service.dart';
 import '../theme/app_theme.dart';
 
 /// Chat with the AI assistant (Groq). Rate limits are shown as friendly
-/// banners instead of errors.
+/// banners instead of errors. Questions can be typed or spoken: the
+/// microphone button turns speech into text in the input box, where the
+/// player can check it before sending.
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key});
 
@@ -23,6 +28,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final VoiceAssistantService _voice = VoiceAssistantService.instance;
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
+  final SpeechToText _speech = SpeechToText();
 
   final List<ChatMessage> _messages = [
     const ChatMessage(
@@ -43,10 +49,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   Timer? _cooldownTimer;
   int _cooldown = 0;
 
+  bool _listening = false;
+  // Text already in the box when listening started; speech is added after it.
+  String _textBeforeListening = '';
+
   @override
   void dispose() {
     // Do not keep reading an answer after the player left the chat.
     unawaited(_voice.stop());
+    if (_listening) unawaited(_speech.cancel());
     _cooldownTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
@@ -73,6 +84,111 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             : 'Voice off.'),
         duration: const Duration(seconds: 2),
       ));
+  }
+
+  void _showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(text),
+        duration: const Duration(seconds: 3),
+      ));
+  }
+
+  /// Starts or stops voice input. While listening, the words appear in the
+  /// input box as they are recognised; nothing is sent automatically.
+  Future<void> _toggleListening() async {
+    if (_listening) {
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+
+    // Do not let the microphone pick up the assistant reading an answer.
+    await _voice.stop();
+
+    bool available;
+    try {
+      available = await _speech.initialize(
+        onError: _onSpeechError,
+        onStatus: _onSpeechStatus,
+      );
+    } catch (_) {
+      available = false;
+    }
+    if (!mounted) return;
+
+    if (!available) {
+      _showMessage('Voice input is not available. Allow microphone access '
+          'for NEON XO in your phone settings and try again.');
+      return;
+    }
+
+    _textBeforeListening = _input.text.trim();
+    setState(() => _listening = true);
+
+    try {
+      await _speech.listen(
+        onResult: _onSpeechResult,
+        listenOptions: SpeechListenOptions(
+          listenMode: ListenMode.dictation,
+          partialResults: true,
+          cancelOnError: true,
+          pauseFor: const Duration(seconds: 3),
+          listenFor: const Duration(seconds: 30),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _listening = false);
+      _showMessage('Could not start voice input. Please try again.');
+    }
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    if (!mounted || !_listening) return;
+
+    var text = [_textBeforeListening, result.recognizedWords.trim()]
+        .where((part) => part.isNotEmpty)
+        .join(' ');
+    if (text.length > AiAssistantService.maxInputLength) {
+      text = text.substring(0, AiAssistantService.maxInputLength);
+    }
+
+    _input.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+
+    if (result.finalResult) setState(() => _listening = false);
+  }
+
+  void _onSpeechStatus(String status) {
+    if (!mounted) return;
+    if (status == SpeechToText.doneStatus ||
+        status == SpeechToText.notListeningStatus) {
+      setState(() => _listening = false);
+    }
+  }
+
+  void _onSpeechError(SpeechRecognitionError error) {
+    if (!mounted) return;
+    setState(() => _listening = false);
+
+    switch (error.errorMsg) {
+      case 'error_no_match':
+      case 'error_speech_timeout':
+        _showMessage("Didn't catch that. Tap the microphone and try again.");
+      case 'error_permission':
+      case 'error_insufficient_permissions':
+        _showMessage('Microphone permission is needed for voice input.');
+      case 'error_network':
+      case 'error_network_timeout':
+        _showMessage('Voice input needs an internet connection.');
+      default:
+        _showMessage('Voice input stopped. Please try again.');
+    }
   }
 
   void _startCooldown(int seconds) {
@@ -107,6 +223,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     if (text.isEmpty || _sending || _cooldown > 0) return;
 
     AudioService.playButtonSound();
+
+    if (_listening) {
+      unawaited(_speech.cancel());
+      _listening = false;
+    }
 
     // History sent to the API: everything except the greeting.
     final history = _messages.skip(1).toList();
@@ -296,10 +417,24 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                       maxLines: 4,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
-                      decoration: const InputDecoration(
-                        hintText: 'Ask something...',
+                      decoration: InputDecoration(
+                        hintText: _listening
+                            ? 'Listening... speak now'
+                            : 'Ask something...',
                         counterText: '',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          tooltip: _listening
+                              ? 'Stop voice input'
+                              : 'Speak your question',
+                          onPressed: _toggleListening,
+                          icon: Icon(
+                            _listening ? Icons.mic : Icons.mic_none,
+                            color: _listening
+                                ? AppTheme.neonPink
+                                : AppTheme.neonCyan,
+                          ),
+                        ),
                       ),
                     ),
                   ),

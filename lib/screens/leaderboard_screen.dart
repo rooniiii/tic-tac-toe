@@ -23,7 +23,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   UserStats _stats = const UserStats();
   UserStats _computerStats = const UserStats();
   UserStats _guestStats = const UserStats();
-  UserStats _playerStats = const UserStats();
 
   bool _loading = true;
 
@@ -51,18 +50,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         opponentType: 'guest',
       );
 
-      final player = await _profile.getStats(
-        widget.user.phone,
-        opponentType: 'player',
-      );
-
       if (!mounted) return;
 
       setState(() {
         _stats = allStats;
         _computerStats = computer;
         _guestStats = guest;
-        _playerStats = player;
         _loading = false;
       });
     } catch (_) {

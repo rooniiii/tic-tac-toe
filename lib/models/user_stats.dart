@@ -23,15 +23,6 @@ class UserStats {
   int get draws => _draws;
   int get bestScore => _bestScore;
 
-  /// result is 'win', 'loss' or 'draw'
-  UserStats addResult(String result, int score) => UserStats(
-    played: _played + 1,
-    wins: _wins + (result == 'win' ? 1 : 0),
-    losses: _losses + (result == 'loss' ? 1 : 0),
-    draws: _draws + (result == 'draw' ? 1 : 0),
-    bestScore: score > _bestScore ? score : _bestScore,
-  );
-
   Map<String, dynamic> toMap() => {
     'played': _played,
     'wins': _wins,

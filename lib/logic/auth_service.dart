@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:tic_tac_toe/security/secure_prefs.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
@@ -12,7 +11,6 @@ import '../services/account_status_service.dart';
 import '../services/leaderboard_service.dart';
 import 'auth/login_attempt_limiter.dart';
 import 'auth/offline_credentials_store.dart';
-import 'auth/password_hasher.dart';
 import 'auth/session_manager.dart';
 
 class LoginResult {
@@ -24,8 +22,6 @@ class LoginResult {
 }
 
 class AuthService {
-  static const int maxAttempts = 3;
-  static const int lockSeconds = 30;
 
   static const String _invalidCredentials = 'Incorrect email or password';
 
@@ -320,88 +316,9 @@ class AuthService {
   // Migration
   // ---------------------------------------------------------------------------
 
-  Future<void> _migrateOldUsers() async {
-    final prefs = await SecurePrefs.getInstance()
-        .timeout(const Duration(seconds: 10));
-
-    if (prefs.getBool('sqlite_users_migrated') == true) {
-      return;
-    }
-
-    final raw = prefs.getString('users');
-
-    if (raw != null) {
-      final users = jsonDecode(raw) as Map<String, dynamic>;
-
-      for (final entry in users.entries) {
-        final data = Map<String, dynamic>.from(entry.value);
-
-        if (data['role'] == 'admin') continue;
-
-        final phone = data['phone'] as String;
-
-        final existingUser = await _db
-            .findUserByPhone(phone)
-            .timeout(const Duration(seconds: 10));
-
-        if (existingUser == null) {
-          await _db
-              .createUser(
-            name: data['name'],
-            phone: phone,
-            passwordHash: data['passwordHash'],
-            salt: data['salt'],
-          )
-              .timeout(const Duration(seconds: 15));
-        }
-      }
-    }
-
-    await prefs.setBool('sqlite_users_migrated', true);
-  }
-
-  Future<void> ensureAdminExists() async {
-    await _migrateOldUsers();
-  }
-
   // ---------------------------------------------------------------------------
   // Sign-up
   // ---------------------------------------------------------------------------
-
-  Future<String?> signUp({
-    required String name,
-    required String phone,
-    required String password,
-  }) async {
-    try {
-      await _migrateOldUsers();
-
-      final existingUser = await _db
-          .findUserByPhone(phone)
-          .timeout(const Duration(seconds: 10));
-
-      if (existingUser != null) {
-        return 'This phone number is already registered';
-      }
-
-      final salt = PasswordHasher.generateSalt();
-
-      await _db
-          .createUser(
-        name: name.trim(),
-        phone: phone,
-        passwordHash: PasswordHasher.hash(password, salt),
-        salt: salt,
-      )
-          .timeout(const Duration(seconds: 15));
-
-      return null;
-    } on TimeoutException {
-      return 'Local signup timed out. Please try again.';
-    } catch (e) {
-      return 'Signup failed: $e';
-    }
-  }
 
   Future<String?> signUpWithFirebase({
     required String name,
@@ -542,78 +459,6 @@ class AuthService {
   // ---------------------------------------------------------------------------
   // Local login
   // ---------------------------------------------------------------------------
-
-  Future<User?> login({
-    required String phone,
-    required String password,
-  }) async {
-    await _migrateOldUsers();
-
-    final data = await _db
-        .findUserByPhone(phone)
-        .timeout(const Duration(seconds: 10));
-
-    if (data == null) return null;
-
-    if (!PasswordHasher.verify(password, data.salt, data.passwordHash)) {
-      return null;
-    }
-
-    if (PasswordHasher.needsUpgrade(data.passwordHash)) {
-      final salt = PasswordHasher.generateSalt();
-      await _db.updateUserPassword(
-        phone: phone,
-        passwordHash: PasswordHasher.hash(password, salt),
-        salt: salt,
-      );
-
-      final upgraded = await _db.findUserByPhone(phone);
-      if (upgraded != null) return _toUser(upgraded);
-    }
-
-    return _toUser(data);
-  }
-
-  Future<LoginResult> secureLogin({
-    required String phone,
-    required String password,
-  }) async {
-    final prefs = await SecurePrefs.getInstance()
-        .timeout(const Duration(seconds: 10));
-
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final lockedUntil = prefs.getInt('lock_$phone') ?? 0;
-
-    if (now < lockedUntil) {
-      final secs = ((lockedUntil - now) / 1000).ceil();
-      return LoginResult.failure(
-        'Too many attempts. Try again in $secs seconds.',
-      );
-    }
-
-    final user = await login(phone: phone, password: password);
-
-    if (user != null) {
-      await prefs.remove('fails_$phone');
-      await prefs.remove('lock_$phone');
-      return LoginResult.success(user);
-    }
-
-    final fails = (prefs.getInt('fails_$phone') ?? 0) + 1;
-
-    if (fails >= maxAttempts) {
-      await prefs.setInt('fails_$phone', 0);
-      await prefs.setInt('lock_$phone', now + lockSeconds * 1000);
-
-      return const LoginResult.failure(
-        '3 wrong attempts. Locked for 30 seconds.',
-      );
-    }
-
-    await prefs.setInt('fails_$phone', fails);
-
-    return const LoginResult.failure('Wrong phone number or password');
-  }
 
   // ---------------------------------------------------------------------------
   // Firebase login
@@ -932,20 +777,7 @@ class AuthService {
     }
   }
 
-  Future<List<User>> getPlayers() async {
-    await _migrateOldUsers();
-
-    final records = await _db
-        .select(_db.appUsers)
-        .get()
-        .timeout(const Duration(seconds: 15));
-
-    return records.map(_toUser).toList();
-  }
-
   Future<bool> deleteUser(String phone) async {
-    await _migrateOldUsers();
-
     final existingUser = await _db
         .findUserByPhone(phone)
         .timeout(const Duration(seconds: 10));

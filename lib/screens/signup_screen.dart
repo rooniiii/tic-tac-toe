@@ -223,6 +223,7 @@ class _SignupScreenState extends State<SignupScreen> {
         backgroundColor: const Color(0xFF090616),
         elevation: 0,
         leading: IconButton(
+          tooltip: 'Back to login',
           icon: const Icon(
             Icons.arrow_back,
             color: AppTheme.neonCyan,
@@ -398,81 +399,84 @@ class _SignupScreenState extends State<SignupScreen> {
                               surface: const Color(0xFF170D32),
                             ),
                           ),
-                          child: IntlPhoneField(
-                            controller: _phoneCtrl,
-                            initialCountryCode: 'PK',
-                            languageCode: 'en',
-                            showDropdownIcon: true,
-                            dropdownIcon: const Icon(
-                              Icons.arrow_drop_down,
-                              color: AppTheme.neonCyan,
-                            ),
-                            dropdownIconPosition:
-                            IconPosition.trailing,
-                            flagsButtonPadding:
-                            const EdgeInsets.symmetric(horizontal: 8),
-                            keyboardType: TextInputType.phone,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                              _CountryPhoneInputFormatter(
-                                countryIso: _selectedCountryIso,
+                          child: Tooltip(
+                            message: 'Choose your country, then enter your mobile number',
+                            child: IntlPhoneField(
+                              controller: _phoneCtrl,
+                              initialCountryCode: 'PK',
+                              languageCode: 'en',
+                              showDropdownIcon: true,
+                              dropdownIcon: const Icon(
+                                Icons.arrow_drop_down,
+                                color: AppTheme.neonCyan,
                               ),
-                            ],
-                            autovalidateMode:
-                            AutovalidateMode.disabled,
-                            invalidNumberMessage:
-                            'Enter a valid mobile number',
-                            validator: _validatePhone,
-                            onCountryChanged: (country) {
-                              setState(() {
-                                _selectedCountryIso = country.code;
-                              });
-
-                              _validatePhoneOnBlur();
-                            },
-                            onChanged: (phone) {
-                              _phoneValue = phone;
-                              _completePhone = phone.completeNumber;
-
-                              if (_phoneTouched && _phoneError != null) {
+                              dropdownIconPosition:
+                              IconPosition.trailing,
+                              flagsButtonPadding:
+                              const EdgeInsets.symmetric(horizontal: 8),
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                _CountryPhoneInputFormatter(
+                                  countryIso: _selectedCountryIso,
+                                ),
+                              ],
+                              autovalidateMode:
+                              AutovalidateMode.disabled,
+                              invalidNumberMessage:
+                              'Enter a valid mobile number',
+                              validator: _validatePhone,
+                              onCountryChanged: (country) {
                                 setState(() {
-                                  _phoneError = _validatePhone(phone);
+                                  _selectedCountryIso = country.code;
                                 });
-                              }
-                            },
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                            ),
-                            dropdownTextStyle: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                            cursorColor: AppTheme.neonCyan,
-                            decoration: InputDecoration(
-                              hintText: 'Enter phone number',
-                              errorText: _phoneError,
-                              hintStyle: const TextStyle(
-                                color: Colors.white54,
+
+                                _validatePhoneOnBlur();
+                              },
+                              onChanged: (phone) {
+                                _phoneValue = phone;
+                                _completePhone = phone.completeNumber;
+
+                                if (_phoneTouched && _phoneError != null) {
+                                  setState(() {
+                                    _phoneError = _validatePhone(phone);
+                                  });
+                                }
+                              },
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
                               ),
-                              filled: true,
-                              fillColor: const Color(0xFF120B27),
-                              contentPadding:
-                              const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 17,
+                              dropdownTextStyle: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
                               ),
-                              enabledBorder: _phoneBorder(
-                                AppTheme.purple,
-                              ),
-                              focusedBorder: _phoneBorder(
-                                AppTheme.neonCyan,
-                              ),
-                              errorBorder: _phoneBorder(
-                                Colors.redAccent,
-                              ),
-                              focusedErrorBorder: _phoneBorder(
-                                Colors.redAccent,
+                              cursorColor: AppTheme.neonCyan,
+                              decoration: InputDecoration(
+                                hintText: 'Enter phone number',
+                                errorText: _phoneError,
+                                hintStyle: const TextStyle(
+                                  color: Colors.white54,
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFF120B27),
+                                contentPadding:
+                                const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 17,
+                                ),
+                                enabledBorder: _phoneBorder(
+                                  AppTheme.purple,
+                                ),
+                                focusedBorder: _phoneBorder(
+                                  AppTheme.neonCyan,
+                                ),
+                                errorBorder: _phoneBorder(
+                                  Colors.redAccent,
+                                ),
+                                focusedErrorBorder: _phoneBorder(
+                                  Colors.redAccent,
+                                ),
                               ),
                             ),
                           ),
@@ -542,21 +546,25 @@ class _SignupScreenState extends State<SignupScreen> {
 
                       NeonButton(
                         text: 'SIGN UP',
+                        tooltip: 'Create your NEON XO account',
                         loading: _loading,
                         onPressed: _loading ? null : _submit,
                       ),
 
                       const SizedBox(height: 16),
 
-                      TextButton(
-                        onPressed: _loading
-                            ? null
-                            : () => Navigator.pop(context),
-                        child: const Text(
-                          'Already have an account? Login',
-                          style: TextStyle(
-                            color: AppTheme.neonCyan,
-                            fontWeight: FontWeight.w600,
+                      Tooltip(
+                        message: 'Go back to the login screen',
+                        child: TextButton(
+                          onPressed: _loading
+                              ? null
+                              : () => Navigator.pop(context),
+                          child: const Text(
+                            'Already have an account? Login',
+                            style: TextStyle(
+                              color: AppTheme.neonCyan,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),

@@ -82,7 +82,7 @@ void main() {
       expect(game.board.every((c) => c == null), isTrue);
       expect(game.current, Mark.x);
       expect(game.winner, isNull);
-      expect(game.canUndo, isFalse);
+      expect(game.movesPlayed, 0);
     });
 
     test('board getter returns a copy', () {

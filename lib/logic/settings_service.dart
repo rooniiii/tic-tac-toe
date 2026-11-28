@@ -26,16 +26,6 @@ class SettingsService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> setMusic(bool value) async {
-    _music = value;
-    notifyListeners();
-
-    try {
-      final prefs = await SecurePrefs.getInstance();
-      await prefs.setBool('music', value);
-    } catch (_) {}
-  }
-
   Future<void> setSound(bool value) async {
     _sound = value;
     notifyListeners();

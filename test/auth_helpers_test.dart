@@ -87,19 +87,6 @@ void main() {
   });
 
   group('UserStats', () {
-    test('addResult counts results and keeps the best score', () {
-      final stats = const UserStats()
-          .addResult('win', 30)
-          .addResult('loss', 10)
-          .addResult('draw', 0);
-
-      expect(stats.played, 3);
-      expect(stats.wins, 1);
-      expect(stats.losses, 1);
-      expect(stats.draws, 1);
-      expect(stats.bestScore, 30);
-    });
-
     test('toMap / fromMap round trip', () {
       const stats = UserStats(played: 5, wins: 3, losses: 1, draws: 1, bestScore: 90);
       final copy = UserStats.fromMap(stats.toMap());

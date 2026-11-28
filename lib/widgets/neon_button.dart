@@ -7,17 +7,21 @@ class NeonButton extends StatelessWidget {
   final Color color;
   final bool loading;
 
+  /// Shown on long-press / mouse hover and read by screen readers.
+  final String? tooltip;
+
   const NeonButton({
     super.key,
     required this.text,
     required this.onPressed,
     this.color = AppTheme.neonPink,
     this.loading = false,
+    this.tooltip,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final button = Container(
       width: double.infinity,
       constraints: const BoxConstraints(
         minHeight: 48,
@@ -62,5 +66,9 @@ class NeonButton extends StatelessWidget {
         ),
       ),
     );
+
+    final message = tooltip;
+    if (message == null) return button;
+    return Tooltip(message: message, child: button);
   }
 }

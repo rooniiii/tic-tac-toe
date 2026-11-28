@@ -272,29 +272,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         Align(
                           alignment: Alignment.centerRight,
-                          child: TextButton(
-                            onPressed:
-                            (_resetLoading || _loading)
-                                ? null
-                                : _forgotPassword,
-                            child: _resetLoading
-                                ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child:
-                              CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color:
-                                AppTheme.neonCyan,
-                              ),
-                            )
-                                : const Text(
-                              'Forgot Password?',
-                              style: TextStyle(
-                                color:
-                                AppTheme.neonCyan,
-                                fontWeight:
-                                FontWeight.w600,
+                          child: Tooltip(
+                            message: 'Send a password reset link to your email',
+                            child: TextButton(
+                              onPressed:
+                              (_resetLoading || _loading)
+                                  ? null
+                                  : _forgotPassword,
+                              child: _resetLoading
+                                  ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color:
+                                  AppTheme.neonCyan,
+                                ),
+                              )
+                                  : const Text(
+                                'Forgot Password?',
+                                style: TextStyle(
+                                  color:
+                                  AppTheme.neonCyan,
+                                  fontWeight:
+                                  FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -304,6 +307,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         NeonButton(
                           text: 'LOGIN',
+                          tooltip: 'Log in with your email and password',
                           loading: _loading,
                           onPressed:
                           (_loading || _resetLoading)
@@ -313,24 +317,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         const SizedBox(height: 18),
 
-                        TextButton(
-                          onPressed:
-                          (_loading || _resetLoading)
-                              ? null
-                              : () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                const SignupScreen(),
+                        Tooltip(
+                          message: 'Create a new NEON XO account',
+                          child: TextButton(
+                            onPressed:
+                            (_loading || _resetLoading)
+                                ? null
+                                : () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                  const SignupScreen(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "Don't have an account? Sign up",
+                              style: TextStyle(
+                                color: AppTheme.neonCyan,
+                                fontWeight: FontWeight.w600,
                               ),
-                            );
-                          },
-                          child: const Text(
-                            "Don't have an account? Sign up",
-                            style: TextStyle(
-                              color: AppTheme.neonCyan,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),

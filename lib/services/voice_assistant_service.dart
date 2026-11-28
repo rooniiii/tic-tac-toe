@@ -22,8 +22,6 @@ class VoiceAssistantService {
   String _lastMessage = '';
   DateTime? _lastMessageTime;
 
-  bool get isEnabled => _isEnabled;
-
   Future<void> initialize() async {
     if (_isInitialized) return;
 

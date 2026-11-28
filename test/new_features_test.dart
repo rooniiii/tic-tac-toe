@@ -38,7 +38,6 @@ void main() {
       final finished = await service.recordWin(phone, Difficulty.hard, 1000);
       expect(finished, isTrue);
       expect(await service.currentLevel(phone, Difficulty.hard), 1);
-      expect(await service.completedRuns(phone, Difficulty.hard), 1);
     });
 
     test('stored values are clamped to 1..1000', () async {

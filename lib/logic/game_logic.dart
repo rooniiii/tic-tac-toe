@@ -19,7 +19,6 @@ class GameLogic {
   List<int>? get winLine => _winLine;
   bool get isDraw => _winner == null && !_board.contains(null);
   bool get isOver => _winner != null || isDraw;
-  bool get canUndo => _history.isNotEmpty;
   int get movesPlayed => _history.length;
 
   /// Returns true if the move was accepted.
