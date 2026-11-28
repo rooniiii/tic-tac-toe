@@ -10,7 +10,6 @@ import '../services/house_ad_service.dart';
 import 'ai_assistant_screen.dart';
 import '../services/audio_service.dart';
 import '../services/voice_assistant_service.dart';
-import '../services/rewarded_ad_service.dart';
 import '../models/difficulty.dart';
 import '../models/user.dart';
 import '../models/user_stats.dart';
@@ -51,8 +50,7 @@ class _MenuScreenState extends State<MenuScreen> {
   void initState() {
     super.initState();
 
-    // Preload rewarded ad and admin-managed ads in the background.
-    RewardedAdService().loadAd();
+    // Preload the admin-managed ads in the background.
     HouseAdService.instance.preload();
 
     _loadSettings();

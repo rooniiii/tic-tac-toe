@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../logic/settings_service.dart';
 import '../services/ai_assistant_service.dart';
 import '../services/audio_service.dart';
 import '../services/voice_assistant_service.dart';
@@ -18,6 +19,8 @@ class AiAssistantScreen extends StatefulWidget {
 
 class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final AiAssistantService _assistant = AiAssistantService.instance;
+  final SettingsService _settings = SettingsService.instance;
+  final VoiceAssistantService _voice = VoiceAssistantService.instance;
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
@@ -42,10 +45,34 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   void dispose() {
+    // Do not keep reading an answer after the player left the chat.
+    unawaited(_voice.stop());
     _cooldownTimer?.cancel();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// Same switch as "Voice Assistant" in the menu settings, so turning it
+  /// on/off here applies to the whole game.
+  Future<void> _toggleVoice() async {
+    AudioService.playButtonSound();
+    final enabled = !_settings.voiceAssistant;
+    await _settings.setVoiceAssistant(enabled);
+    await _voice.setEnabled(enabled);
+    if (!mounted) return;
+    setState(() {});
+    if (enabled) {
+      unawaited(_voice.speak('Voice on. I will read my answers aloud.'));
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(enabled
+            ? 'Voice on: answers are read aloud.'
+            : 'Voice off.'),
+        duration: const Duration(seconds: 2),
+      ));
   }
 
   void _startCooldown(int seconds) {
@@ -96,7 +123,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       final answer = await _assistant.ask(text, history);
       if (!mounted) return;
       setState(() => _messages.add(ChatMessage('assistant', answer)));
-      unawaited(VoiceAssistantService.instance.speak(answer));
+      unawaited(_voice.speak(answer));
     } on AssistantException catch (e) {
       if (!mounted) return;
       // Give the question back so the player does not have to retype it.
@@ -105,7 +132,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _input.text = text;
         _notice = e.message;
       });
-      unawaited(VoiceAssistantService.instance.speak(e.message));
+      unawaited(_voice.speak(e.message));
       if (e.retryAfterSeconds != null) _startCooldown(e.retryAfterSeconds!);
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -131,7 +158,29 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: color.withAlpha(150)),
           ),
-          child: SelectableText(m.text, style: const TextStyle(height: 1.4)),
+          child: m.isUser
+              ? SelectableText(m.text, style: const TextStyle(height: 1.4))
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: SelectableText(
+                        m.text,
+                        style: const TextStyle(height: 1.4),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Read aloud',
+                      visualDensity: VisualDensity.compact,
+                      iconSize: 18,
+                      color: AppTheme.neonPink,
+                      onPressed: () =>
+                          unawaited(_voice.speak(m.text, force: true)),
+                      icon: const Icon(Icons.volume_up),
+                    ),
+                  ],
+                ),
         ),
       ),
     );
@@ -149,6 +198,28 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
           style: TextStyle(color: AppTheme.neonCyan),
         ),
         iconTheme: const IconThemeData(color: AppTheme.neonCyan),
+        actions: [
+          IconButton(
+            tooltip: _settings.voiceAssistant
+                ? 'Turn voice off'
+                : 'Turn voice on (read answers aloud)',
+            onPressed: _toggleVoice,
+            icon: Icon(
+              _settings.voiceAssistant
+                  ? Icons.record_voice_over
+                  : Icons.voice_over_off,
+              color: _settings.voiceAssistant
+                  ? AppTheme.neonCyan
+                  : Colors.white54,
+            ),
+          ),
+          if (_settings.voiceAssistant)
+            IconButton(
+              tooltip: 'Stop speaking',
+              onPressed: () => unawaited(_voice.stop()),
+              icon: const Icon(Icons.stop_circle_outlined),
+            ),
+        ],
       ),
       // resizeToAvoidBottomInset (default) keeps the input above the keyboard.
       body: SafeArea(

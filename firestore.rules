@@ -14,6 +14,8 @@ rules_version = '2';
 //                        Must always match the player's real player_stats.
 //   admin_logs/{id}      Record of every admin action. Admin-only, and
 //                        entries can never be changed or deleted.
+//   app_config/session   Login timeouts set by admins. Read by signed-in
+//                        users, written by admins only.
 //   ads/{id}             Advertisements shown in the game with a countdown
 //                        (15 s by default). Managed by admins, read-only
 //                        for signed-in players.
@@ -115,6 +117,28 @@ service cloud.firestore {
           && d.countdownSeconds >= 5 && d.countdownSeconds <= 60
           && d.active is bool;
       }
+    }
+
+    // ---------- app settings ----------
+
+    // app_config/session: login timeouts set in the Admin app. The game
+    // reads them when restoring a login; only admins can change them.
+    // Limits match SessionSettings (admin) and SessionManager (game).
+    match /app_config/session {
+      allow read: if signedIn();
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(
+             ['playerIdleDays', 'playerMaxAgeDays', 'adminIdleMinutes',
+              'updatedAt', 'updatedBy'])
+        && request.resource.data.playerIdleDays is int
+        && request.resource.data.playerIdleDays >= 1
+        && request.resource.data.playerIdleDays <= 90
+        && request.resource.data.playerMaxAgeDays is int
+        && request.resource.data.playerMaxAgeDays >= request.resource.data.playerIdleDays
+        && request.resource.data.playerMaxAgeDays <= 365
+        && request.resource.data.adminIdleMinutes is int
+        && request.resource.data.adminIdleMinutes >= 1
+        && request.resource.data.adminIdleMinutes <= 120;
     }
 
     // ---------- players ----------

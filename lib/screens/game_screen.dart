@@ -14,7 +14,6 @@ import '../database/app_database.dart';
 import '../services/audio_service.dart';
 import '../services/firestore_sync_service.dart';
 import '../services/voice_assistant_service.dart';
-import '../services/rewarded_ad_service.dart';
 import '../services/house_ad_service.dart';
 import '../logic/level_progress_service.dart';
 import 'ad_countdown_screen.dart';
@@ -47,7 +46,6 @@ class _GameScreenState extends State<GameScreen> {
   final GameLogic _game = GameLogic();
   final ProfileService _profile = ProfileService();
   final AppDatabase _db = AppDatabase.instance;
-  final RewardedAdService _rewardedAdService = RewardedAdService();
 
   late final Player _human;
   late final Player _opponent;
@@ -56,9 +54,8 @@ class _GameScreenState extends State<GameScreen> {
   bool _busy = false;
   bool _gameFinished = false;
   bool _leaving = false;
-  bool _adIsReady = false;
 
-  // Admin-managed countdown ad, used when no AdMob ad is available.
+  // Admin-managed countdown ad, used as the reward ad for an extra Undo.
   bool _houseAdReady = false;
   bool _showingHouseAd = false;
 
@@ -95,7 +92,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   String get _adButtonLabel {
-    if (!_adIsReady && !_houseAdReady) return 'AD LOADING...';
+    if (!_houseAdReady) return 'AD LOADING...';
 
     if (widget.vsComputer) {
       return 'WATCH AD  +1 UNDO';
@@ -137,21 +134,6 @@ class _GameScreenState extends State<GameScreen> {
 
     _score = widget.score;
 
-    // Check whether the ad was already loaded from Menu Screen.
-    _adIsReady = _rewardedAdService.isAdReady;
-
-    // Listen for ad loading and closing updates.
-    _rewardedAdService.onAdStateChanged = () {
-      if (!mounted) return;
-
-      setState(() {
-        _adIsReady = _rewardedAdService.isAdReady;
-      });
-    };
-
-    // If Menu Screen has not loaded it yet, continue loading here.
-    _rewardedAdService.loadAd();
-
     unawaited(HouseAdService.instance.pickAd().then((ad) {
       if (!mounted) return;
       setState(() => _houseAdReady = ad != null);
@@ -166,10 +148,6 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
-    // Do not destroy the shared preloaded ad.
-    _rewardedAdService.onAdStateChanged = null;
-    _rewardedAdService.onAdClosed = null;
-
     super.dispose();
   }
 
@@ -181,18 +159,7 @@ class _GameScreenState extends State<GameScreen> {
     // Remember which player requested the ad.
     final rewardedPlayer = _game.current;
 
-    if (!_adIsReady) {
-      unawaited(_watchHouseAdForUndo(rewardedPlayer));
-      return;
-    }
-
-    _rewardedAdService.showAd(
-      onRewardEarned: () => _grantRewardedUndo(rewardedPlayer),
-      onAdUnavailable: () {
-        if (!mounted || _leaving) return;
-        unawaited(_watchHouseAdForUndo(rewardedPlayer));
-      },
-    );
+    unawaited(_watchHouseAdForUndo(rewardedPlayer));
   }
 
   void _grantRewardedUndo(Mark rewardedPlayer) {
@@ -216,7 +183,7 @@ class _GameScreenState extends State<GameScreen> {
     );
   }
 
-  /// Fallback reward: the admin-managed ad with its countdown (15 s by
+  /// Reward ad: the admin-managed ad with its countdown (15 s by
   /// default). The extra Undo is given only when it was watched fully.
   Future<void> _watchHouseAdForUndo(Mark rewardedPlayer) async {
     if (_showingHouseAd) return;
@@ -828,7 +795,7 @@ class _GameScreenState extends State<GameScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
           child: ElevatedButton.icon(
-            onPressed: (_adIsReady || _houseAdReady) &&
+            onPressed: _houseAdReady &&
                 _canWatchAd &&
                 canUndoNow &&
                 !_busy &&

@@ -93,10 +93,14 @@ class VoiceAssistantService {
     }
   }
 
-  Future<void> speak(String message) async {
+  /// Speaks [message] when the voice assistant is enabled.
+  ///
+  /// [force] speaks even while the assistant is off. Use it only for an
+  /// explicit player action, e.g. tapping "read aloud" on a chat message.
+  Future<void> speak(String message, {bool force = false}) async {
     final String text = message.trim();
 
-    if (!_isEnabled || text.isEmpty) return;
+    if ((!_isEnabled && !force) || text.isEmpty) return;
 
     final DateTime now = DateTime.now();
 
@@ -118,13 +122,13 @@ class VoiceAssistantService {
       _enqueue(() async {
         await initialize();
 
-        if (!_isEnabled || generation != _speechGeneration) {
+        if ((!_isEnabled && !force) || generation != _speechGeneration) {
           return;
         }
 
         await _flutterTts.stop();
 
-        if (!_isEnabled || generation != _speechGeneration) {
+        if ((!_isEnabled && !force) || generation != _speechGeneration) {
           return;
         }
 

@@ -96,6 +96,8 @@ class AuthService {
   /// logs out) when it expired. Sessions from older app versions without a
   /// token are upgraded to a new session.
   Future<bool> _sessionStillValid() async {
+    // Use the latest timeouts set by admins (cached copy when offline).
+    await SessionManager.instance.refreshPolicy();
     final state = await SessionManager.instance.check();
 
     switch (state) {
