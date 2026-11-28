@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../logic/auth_service.dart';
+import '../main.dart' show showSessionExpiredMessage;
 import '../models/user.dart';
 import 'login_screen.dart';
 import 'menu_screen.dart';
@@ -46,6 +47,7 @@ class _SplashScreenState extends State<SplashScreen>
     _navigationStarted = true;
 
     User? user;
+    bool expired = false;
 
     try {
       // Restore the existing user session.
@@ -57,6 +59,7 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (result.error != null) {
         debugPrint('Session restore: ${result.error}');
+        expired = result.error == AuthService.sessionExpiredMessage;
       }
     } catch (e) {
       debugPrint('Session restore error: $e');
@@ -68,6 +71,8 @@ class _SplashScreenState extends State<SplashScreen>
     final Widget nextScreen = user != null
         ? MenuScreen(user: user)
         : const LoginScreen();
+
+    if (expired) showSessionExpiredMessage();
 
     Navigator.pushReplacement(
       context,
