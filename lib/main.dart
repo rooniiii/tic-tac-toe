@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
@@ -19,9 +20,13 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Firebase App Check - Android Debug Mode
+  // Firebase App Check: release builds prove they are the real app from
+  // Google Play (Play Integrity). Debug builds use the debug provider so
+  // developers can still run the app; register the debug token printed in
+  // logcat in the Firebase Console.
   await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
+    androidProvider:
+        kReleaseMode ? AndroidProvider.playIntegrity : AndroidProvider.debug,
   );
 
   runApp(const MyApp());
@@ -153,4 +158,4 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       home: const SplashScreen(),
     );
   }
-}
+}

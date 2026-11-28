@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 
 import '../../database/app_database.dart';
 import 'password_hasher.dart';
@@ -34,7 +34,7 @@ class OfflineCredentialsStore {
   String _blockedKey(String email) => 'account_blocked_${_key(email)}';
 
   Future<String?> phoneForEmail(String email) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     return prefs.getString(_phoneKey(email));
   }
 
@@ -65,7 +65,7 @@ class OfflineCredentialsStore {
       );
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     await prefs.setString(_phoneKey(email), phone);
   }
 
@@ -130,25 +130,25 @@ class OfflineCredentialsStore {
   Future<void> markBlocked(String email) async {
     if (_key(email).isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     await prefs.setBool(_blockedKey(email), true);
     await prefs.remove(_phoneKey(email));
   }
 
   Future<void> clearBlocked(String email) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     await prefs.remove(_blockedKey(email));
   }
 
   Future<bool> isBlocked(String email) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     return prefs.getBool(_blockedKey(email)) ?? false;
   }
 
   /// Removes everything stored for this email (used when the account is
   /// deleted).
   Future<void> forget(String email) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     await prefs.remove(_phoneKey(email));
     await prefs.remove(_blockedKey(email));
   }

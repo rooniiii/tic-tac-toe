@@ -1,6 +1,6 @@
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tic_tac_toe/main.dart';
 import 'package:tic_tac_toe/screens/login_screen.dart';
@@ -11,7 +11,7 @@ import 'package:tic_tac_toe/screens/splash_screen.dart';
 /// and the player lands on the login screen.
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    SecurePrefs.setMockInitialValues({});
     // flutter_tts has no implementation in tests.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(

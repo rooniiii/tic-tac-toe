@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 
 /// Locks email login on this device after repeated wrong passwords.
 /// Each new lock lasts longer than the previous one.
@@ -20,7 +20,7 @@ class LoginAttemptLimiter {
 
   /// Returns a message if login is currently locked, otherwise null.
   Future<String?> checkLock(String email) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
 
     final now = DateTime.now().millisecondsSinceEpoch;
     final lockedUntil = prefs.getInt(_lockUntilKey(email)) ?? 0;
@@ -38,7 +38,7 @@ class LoginAttemptLimiter {
     String email,
     String invalidCredentialsMessage,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
 
     final fails = (prefs.getInt(_failsKey(email)) ?? 0) + 1;
 
@@ -63,7 +63,7 @@ class LoginAttemptLimiter {
   }
 
   Future<void> clear(String email) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
 
     await prefs.remove(_failsKey(email));
     await prefs.remove(_lockUntilKey(email));

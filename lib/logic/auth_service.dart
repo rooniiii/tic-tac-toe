@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -79,7 +79,7 @@ class AuthService {
     String email, {
     bool newSession = true,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     await prefs.setString(_activeSessionKey, email.trim().toLowerCase());
 
     if (newSession) {
@@ -151,7 +151,7 @@ class AuthService {
     try {
       await _firebaseAuth.signOut();
     } finally {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       await prefs.remove(_activeSessionKey);
       await SessionManager.instance.clear();
     }
@@ -162,7 +162,7 @@ class AuthService {
   // ---------------------------------------------------------------------------
 
   Future<LoginResult> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     final hasSession = _firebaseAuth.currentUser != null ||
         (prefs.getString(_activeSessionKey)?.isNotEmpty ?? false);
 
@@ -247,7 +247,7 @@ class AuthService {
 
   Future<LoginResult> _restoreLocalSession() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
 
       final email = prefs.getString(_activeSessionKey);
 
@@ -321,7 +321,7 @@ class AuthService {
   // ---------------------------------------------------------------------------
 
   Future<void> _migrateOldUsers() async {
-    final prefs = await SharedPreferences.getInstance()
+    final prefs = await SecurePrefs.getInstance()
         .timeout(const Duration(seconds: 10));
 
     if (prefs.getBool('sqlite_users_migrated') == true) {
@@ -578,7 +578,7 @@ class AuthService {
     required String phone,
     required String password,
   }) async {
-    final prefs = await SharedPreferences.getInstance()
+    final prefs = await SecurePrefs.getInstance()
         .timeout(const Duration(seconds: 10));
 
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -861,7 +861,7 @@ class AuthService {
       await deleteUser(phone);
       await _offline.forget(email);
       await _limiter.clear(email);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       await prefs.remove(_activeSessionKey);
       await SessionManager.instance.clear();
     } catch (e) {

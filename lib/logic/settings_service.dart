@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 
 class SettingsService extends ChangeNotifier {
   SettingsService._();
@@ -16,7 +16,7 @@ class SettingsService extends ChangeNotifier {
 
   Future<void> load() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
 
       _music = prefs.getBool('music') ?? true;
       _sound = prefs.getBool('sound') ?? true;
@@ -31,7 +31,7 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       await prefs.setBool('music', value);
     } catch (_) {}
   }
@@ -41,7 +41,7 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       await prefs.setBool('sound', value);
     } catch (_) {}
   }
@@ -51,7 +51,7 @@ class SettingsService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       await prefs.setBool('voiceAssistant', value);
     } catch (_) {}
   }

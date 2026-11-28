@@ -1,7 +1,7 @@
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tic_tac_toe/models/mark.dart';
 import 'package:tic_tac_toe/screens/ad_countdown_screen.dart';
@@ -10,7 +10,7 @@ import 'package:tic_tac_toe/widgets/board_widget.dart';
 
 void main() {
   setUp(() {
-    SharedPreferences.setMockInitialValues({'sound': false});
+    SecurePrefs.setMockInitialValues({'sound': false});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       const MethodChannel('flutter_tts'),

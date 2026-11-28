@@ -8,8 +8,9 @@ list(APPEND FLUTTER_PLUGIN_LIST
   cloud_firestore
   firebase_app_check
   firebase_auth
+  flutter_secure_storage_windows
   flutter_tts
-  sqlite3_flutter_libs
+  sqlcipher_flutter_libs
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

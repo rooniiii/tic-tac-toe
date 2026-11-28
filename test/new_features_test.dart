@@ -1,5 +1,5 @@
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tic_tac_toe/logic/auth/session_manager.dart';
 import 'package:tic_tac_toe/logic/input_sanitizer.dart';
@@ -8,7 +8,7 @@ import 'package:tic_tac_toe/models/difficulty.dart';
 import 'package:tic_tac_toe/services/house_ad_service.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() => SecurePrefs.setMockInitialValues({}));
 
   group('LevelProgressService', () {
     final service = LevelProgressService();
@@ -42,7 +42,7 @@ void main() {
     });
 
     test('stored values are clamped to 1..1000', () async {
-      SharedPreferences.setMockInitialValues({'level_${phone}_easy': 5000});
+      SecurePrefs.setMockInitialValues({'level_${phone}_easy': 5000});
       expect(await service.currentLevel(phone, Difficulty.easy), 1000);
     });
   });
@@ -61,7 +61,7 @@ void main() {
     test('expires after the idle timeout', () async {
       final now = DateTime.now();
       final old = now.subtract(SessionManager.idleTimeout + const Duration(hours: 1));
-      SharedPreferences.setMockInitialValues({
+      SecurePrefs.setMockInitialValues({
         'session_token': 'abc',
         'session_issued_at': old.millisecondsSinceEpoch,
         'session_last_active': old.millisecondsSinceEpoch,
@@ -71,7 +71,7 @@ void main() {
 
     test('expires after the absolute lifetime even if active', () async {
       final now = DateTime.now();
-      SharedPreferences.setMockInitialValues({
+      SecurePrefs.setMockInitialValues({
         'session_token': 'abc',
         'session_issued_at': now
             .subtract(SessionManager.maxSessionAge + const Duration(days: 1))

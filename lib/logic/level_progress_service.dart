@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 
 import '../models/difficulty.dart';
 
@@ -18,7 +18,7 @@ class LevelProgressService {
   /// Level to play next (1..[maxLevel]).
   Future<int> currentLevel(String phone, Difficulty difficulty) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       final level = prefs.getInt(_levelKey(phone, difficulty)) ?? 1;
       return clamp(level);
     } catch (_) {
@@ -29,7 +29,7 @@ class LevelProgressService {
   /// How many times the player finished all [maxLevel] levels.
   Future<int> completedRuns(String phone, Difficulty difficulty) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       return prefs.getInt(_completedKey(phone, difficulty)) ?? 0;
     } catch (_) {
       return 0;
@@ -46,7 +46,7 @@ class LevelProgressService {
     final finished = level >= maxLevel;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       final saved = prefs.getInt(_levelKey(phone, difficulty)) ?? 1;
 
       if (finished) {

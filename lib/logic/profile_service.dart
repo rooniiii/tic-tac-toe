@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 import 'package:drift/drift.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -48,12 +48,12 @@ class ProfileService {
         const Duration(seconds: 5),
       );
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
 
       await prefs.remove(_pendingBioKey(phone));
     } catch (e) {
       if (await AccountStatusService.instance.checkAfterFailure(e)) {
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = await SecurePrefs.getInstance();
         await prefs.remove(_pendingBioKey(phone));
         return;
       }
@@ -67,7 +67,7 @@ class ProfileService {
 
       if (user == null) return '';
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
 
       // Pending local bio has priority.
       final pendingBio = prefs.getString(
@@ -142,7 +142,7 @@ class ProfileService {
     );
 
     // STEP 2: Keep a pending copy until Firebase sync succeeds.
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
 
     await prefs.setString(
       _pendingBioKey(phone),
@@ -196,7 +196,7 @@ class ProfileService {
         draws += row.draws;
       }
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
 
       final bestScore =
           prefs.getInt(_bestScoreKey(phone, false)) ?? 0;
@@ -220,7 +220,7 @@ class ProfileService {
         bool twoPlayer = false,
       }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
 
       final key = _bestScoreKey(phone, twoPlayer);
       final oldScore = prefs.getInt(key) ?? 0;

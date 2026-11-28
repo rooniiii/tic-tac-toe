@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
-import 'package:drift_flutter/drift_flutter.dart';
+
+import 'encrypted_connection.dart';
 
 part 'app_database.g.dart';
 
@@ -67,7 +68,7 @@ class UserProfiles extends Table {
   ],
 )
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(driftDatabase(name: 'neon_xo_database'));
+  AppDatabase() : super(openEncryptedDatabase('neon_xo_database'));
 
   static final AppDatabase instance = AppDatabase();
 

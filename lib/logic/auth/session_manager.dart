@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 
 /// Device-side login session, the mobile equivalent of a session cookie.
 ///
@@ -49,7 +49,7 @@ class SessionManager {
   /// Starts a fresh session after a successful login (old token discarded,
   /// which prevents session fixation).
   Future<void> start() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     final now = DateTime.now().millisecondsSinceEpoch;
 
     await prefs.setString(_tokenKey, _newToken());
@@ -59,7 +59,7 @@ class SessionManager {
 
   /// Marks the session as used (called when the app restores it).
   Future<void> touch() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     if (prefs.getString(_tokenKey) == null) return;
     await prefs.setInt(_lastActiveKey, DateTime.now().millisecondsSinceEpoch);
   }
@@ -76,7 +76,7 @@ class SessionManager {
       final data = snap.data();
       if (data == null) return;
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       final idle = data['playerIdleDays'];
       final age = data['playerMaxAgeDays'];
       if (idle is num) {
@@ -95,7 +95,7 @@ class SessionManager {
   /// Sessions created before this class existed have no token; they are
   /// upgraded to a new session instead of forcing everybody to log in again.
   Future<SessionState> check() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
 
     final token = prefs.getString(_tokenKey);
     final issuedAt = prefs.getInt(_issuedAtKey);
@@ -130,7 +130,7 @@ class SessionManager {
 
   /// Destroys the session (logout, block, account deletion).
   Future<void> clear() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SecurePrefs.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_issuedAtKey);
     await prefs.remove(_lastActiveKey);

@@ -11,8 +11,9 @@
 #include <cloud_firestore/cloud_firestore_plugin_c_api.h>
 #include <firebase_app_check/firebase_app_check_plugin_c_api.h>
 #include <firebase_auth/firebase_auth_plugin_c_api.h>
+#include <flutter_secure_storage_windows/flutter_secure_storage_windows_plugin.h>
 #include <flutter_tts/flutter_tts_plugin.h>
-#include <sqlite3_flutter_libs/sqlite3_flutter_libs_plugin.h>
+#include <sqlcipher_flutter_libs/sqlite3_flutter_libs_plugin.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   AudioplayersWindowsPluginRegisterWithRegistrar(
@@ -25,6 +26,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("FirebaseAppCheckPluginCApi"));
   FirebaseAuthPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FirebaseAuthPluginCApi"));
+  FlutterSecureStorageWindowsPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("FlutterSecureStorageWindowsPlugin"));
   FlutterTtsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("FlutterTtsPlugin"));
   Sqlite3FlutterLibsPluginRegisterWithRegistrar(

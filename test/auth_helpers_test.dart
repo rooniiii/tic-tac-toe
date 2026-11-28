@@ -1,5 +1,5 @@
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:tic_tac_toe/logic/auth/login_attempt_limiter.dart';
 import 'package:tic_tac_toe/logic/auth/password_hasher.dart';
@@ -64,7 +64,7 @@ void main() {
   });
 
   group('LoginAttemptLimiter', () {
-    setUp(() => SharedPreferences.setMockInitialValues({}));
+    setUp(() => SecurePrefs.setMockInitialValues({}));
 
     test('locks after 3 wrong passwords and clear unlocks', () async {
       final limiter = LoginAttemptLimiter();

@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tic_tac_toe/security/secure_prefs.dart';
 
 /// Remembers whether a player has already seen the first-time walkthrough
 /// on this device.
@@ -7,7 +7,7 @@ class OnboardingService {
 
   Future<bool> shouldShow(String phone) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       return !(prefs.getBool(_key(phone)) ?? false);
     } catch (_) {
       return false;
@@ -16,7 +16,7 @@ class OnboardingService {
 
   Future<void> markDone(String phone) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await SecurePrefs.getInstance();
       await prefs.setBool(_key(phone), true);
     } catch (_) {}
   }
